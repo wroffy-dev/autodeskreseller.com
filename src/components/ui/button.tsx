@@ -35,6 +35,10 @@ export function buttonClasses(
   className?: string,
 ): string {
   return cn(
+    // `ui-btn` / `ui-btn-*` are hooks for the admin's design system
+    // (src/app/admin/admin-ui.css). They only match inside `.admin-ui`, so the
+    // public site keeps exactly these utilities.
+    `ui-btn ui-btn-${variant}`,
     'inline-flex items-center justify-center whitespace-nowrap rounded-lg font-medium transition-colors',
     'disabled:pointer-events-none disabled:opacity-50',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2',

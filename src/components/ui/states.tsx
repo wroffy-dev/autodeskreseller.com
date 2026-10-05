@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { CheckCircle, AlertTriangle, Info, XCircle } from '@/components/ui/icons';
 import { cn } from '@/lib/utils/cn';
 
 export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
@@ -64,13 +65,21 @@ export function Alert({
     warning: 'border-amber-200 bg-amber-50 text-amber-900',
     danger: 'border-red-200 bg-red-50 text-red-900',
   } as const;
+  // A tone icon beside the text, so the kind of message is not carried by
+  // colour alone. Shown by the admin's stylesheet only, so the sign-in screens
+  // that share this component keep their current look.
+  const icons = { info: Info, success: CheckCircle, warning: AlertTriangle, danger: XCircle } as const;
+  const Icon = icons[tone];
   return (
     <div
       role={tone === 'danger' ? 'alert' : 'status'}
-      className={cn('rounded-lg border px-4 py-3 text-sm', tones[tone], className)}
+      className={cn('ui-alert flex gap-2.5 rounded-lg border px-4 py-3 text-sm', tones[tone], className)}
     >
-      {title ? <p className="font-semibold">{title}</p> : null}
-      {children ? <div className={cn(title && 'mt-1')}>{children}</div> : null}
+      <Icon className="ui-alert-icon mt-0.5 hidden h-4 w-4 shrink-0" aria-hidden="true" />
+      <div className="min-w-0 flex-1">
+        {title ? <p className="font-semibold">{title}</p> : null}
+        {children ? <div className={cn(title && 'mt-1')}>{children}</div> : null}
+      </div>
     </div>
   );
 }

@@ -1,10 +1,25 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils/cn';
 
-export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+export function Card({
+  className,
+  glass = false,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & {
+  /**
+   * Liquid Glass surface, for overview screens that paint a colour wash
+   * behind their content (the admin dashboard). Solid by default: dense work
+   * areas stay solid and readable.
+   */
+  glass?: boolean;
+}) {
   return (
     <div
-      className={cn('rounded-xl border border-hairline bg-surface shadow-sm', className)}
+      className={cn(
+        'ui-card rounded-xl border border-hairline bg-surface shadow-sm',
+        glass && 'glass-panel',
+        className,
+      )}
       {...props}
     />
   );
@@ -29,7 +44,7 @@ export function CardHeader({
       )}
     >
       <div className="min-w-0">
-        <h2 className="truncate text-base font-semibold text-content">{title}</h2>
+        <h2 className="truncate text-base font-semibold tracking-tight text-content">{title}</h2>
         {description ? <p className="mt-0.5 text-sm text-muted">{description}</p> : null}
       </div>
       {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}

@@ -2,7 +2,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils/cn';
 
 export const inputClasses =
-  'w-full rounded-lg border border-hairline bg-surface px-3 py-2 text-sm text-content shadow-sm ' +
+  'ui-control w-full rounded-lg border border-hairline bg-surface px-3 py-2 text-sm text-content shadow-sm ' +
   'placeholder:text-muted/60 transition-colors ' +
   'focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/25 ' +
   'disabled:cursor-not-allowed disabled:bg-muted/5 disabled:text-muted ' +
@@ -172,7 +172,8 @@ export function Switch({
       >
         <span
           className={cn(
-            'pointer-events-none absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
+            // The knob stays white in the admin's dark theme too.
+            'ui-switch-knob pointer-events-none absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
             checked ? 'translate-x-[1.375rem]' : 'translate-x-0.5',
           )}
         />

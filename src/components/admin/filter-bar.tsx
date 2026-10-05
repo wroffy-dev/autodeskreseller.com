@@ -141,7 +141,7 @@ export function FilterBar({
                 onClick={() => applyPreset(preset)}
                 aria-pressed={isActive}
                 className={cn(
-                  'shrink-0 rounded-lg px-3 py-1.5 text-[0.8125rem] font-medium transition-colors',
+                  'shrink-0 rounded-full px-3 py-1.5 text-[0.8125rem] font-medium transition-colors',
                   isActive
                     ? 'bg-brand/10 text-brand ring-1 ring-inset ring-brand/25'
                     : 'text-muted hover:bg-muted/[0.07] hover:text-content',
@@ -154,8 +154,10 @@ export function FilterBar({
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-0 flex-1 sm:max-w-xs">
+      {/* Search and filters share one glass strip, every control the same
+          height and radius, wrapping cleanly on narrow screens. */}
+      <div className="glass-card flex flex-wrap items-center gap-2 rounded-[var(--radius-card-sm)] border border-hairline bg-surface p-2">
+        <div className="relative min-w-[min(100%,14rem)] flex-1 sm:max-w-xs">
           <Search
             className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
             aria-hidden="true"
@@ -390,7 +392,7 @@ function DateRangeControl({
       </Button>
 
       {open ? (
-        <div className="absolute left-0 top-full z-dropdown mt-1.5 w-72 rounded-xl border border-hairline bg-surface p-3 shadow-xl">
+        <div className="glass-menu absolute left-0 top-full z-dropdown mt-1.5 w-72 rounded-xl border border-hairline bg-surface p-3 shadow-xl">
           <div className="mb-3 grid grid-cols-2 gap-1">
             {DATE_QUICK_PICKS.map((pick) => {
               const picked = resolveRange({ range: pick });
@@ -515,7 +517,7 @@ function AdvancedFilterDrawer({
       aria-label="More filters"
     >
       <div
-        className="absolute inset-0 bg-[rgb(var(--brand-secondary))]/40"
+        className="admin-scrim absolute inset-0 bg-[rgb(var(--brand-secondary))]/40"
         onClick={onClose}
         aria-hidden="true"
       />

@@ -283,3 +283,112 @@ body.admin-ui {
 .admin-ui .logo-dark {
   display: none;
 }
+
+/* -------------------------------------------------------------------------
+ * 4. Primitives
+ *
+ * The shared components carry `ui-*` hook classes; the rules below restyle
+ * them inside the admin only.
+ * ---------------------------------------------------------------------- */
+
+/* Buttons: near-black primary, surface secondary, ghost and danger */
+.admin-ui .ui-btn:not(.ui-btn-link) {
+  border-radius: var(--radius-control);
+}
+.admin-ui .ui-btn:focus-visible {
+  --tw-ring-color: rgb(var(--accent) / 0.6);
+}
+.admin-ui .ui-btn-primary {
+  background-color: rgb(var(--primary));
+  color: rgb(var(--primary-fg));
+}
+.admin-ui .ui-btn-primary:hover:not(:disabled),
+.admin-ui .ui-btn-primary:active:not(:disabled) {
+  background-color: rgb(var(--primary) / 0.86);
+}
+.admin-ui .ui-btn-secondary,
+.admin-ui .ui-btn-outline {
+  background-color: rgb(var(--surface));
+  color: rgb(var(--text));
+  border: 1px solid rgb(var(--border));
+  box-shadow: var(--shadow-sm);
+}
+.admin-ui .ui-btn-secondary:hover:not(:disabled),
+.admin-ui .ui-btn-outline:hover:not(:disabled) {
+  background-color: rgb(var(--surface-soft));
+  border-color: rgb(var(--text-muted) / 0.35);
+}
+.admin-ui .ui-btn-ghost:hover:not(:disabled) {
+  background-color: var(--nav-hover);
+}
+
+/* Inputs, selects, textareas: same radius as buttons, accent focus ring */
+.admin-ui .ui-control {
+  border-radius: var(--radius-control);
+  border-color: rgb(var(--border));
+  box-shadow: var(--shadow-sm);
+}
+.admin-ui .ui-control::placeholder {
+  color: rgb(var(--text-muted) / 0.75);
+}
+.admin-ui .ui-control:focus {
+  border-color: rgb(var(--accent) / 0.7);
+  --tw-ring-color: rgb(var(--accent) / 0.25);
+}
+.admin-ui .ui-control[aria-invalid='true'] {
+  border-color: rgb(239 68 68);
+}
+
+/* Cards: solid surface, hairline border, soft shadow */
+.admin-ui .ui-card {
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm);
+}
+.admin-ui .ui-card.glass-panel {
+  box-shadow:
+    0 1px 2px rgb(var(--shadow-ink) / 0.04),
+    0 14px 36px rgb(var(--shadow-ink) / 0.06),
+    inset 0 1px 0 rgb(var(--glass-tint) / 0.9);
+}
+
+/* KPI tiles */
+.admin-ui .stat-card {
+  border-radius: var(--radius-card);
+}
+.admin-ui a.stat-card:hover {
+  box-shadow: var(--shadow-md), inset 0 1px 0 rgb(var(--glass-tint) / 0.85);
+}
+
+/* Alerts show their tone icon in the admin */
+.admin-ui .ui-alert {
+  border-radius: var(--radius-card-sm);
+}
+.admin-ui .ui-alert-icon {
+  display: block;
+}
+
+/* Dialogs: radius 20px, large soft shadow, a bottom sheet on phones */
+.admin-ui .ui-dialog {
+  border-radius: var(--radius-dialog) var(--radius-dialog) 0 0;
+  box-shadow: var(--shadow-lg);
+}
+@media (min-width: 640px) {
+  .admin-ui .ui-dialog {
+    border-radius: var(--radius-dialog);
+  }
+}
+
+/* Toasts sit over the workspace like a menu does */
+.admin-ui .ui-toast {
+  border-radius: var(--radius-card-sm);
+  box-shadow: var(--shadow-lg);
+}
+
+/* -------------------------------------------------------------------------
+ * 5. Long content safety
+ * ---------------------------------------------------------------------- */
+
+/* Fieldsets default to min-content width, which blows grids apart. */
+.admin-ui fieldset {
+  min-inline-size: 0;
+}
