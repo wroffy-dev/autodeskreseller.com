@@ -4,6 +4,7 @@ import * as React from 'react';
 import { SessionProvider } from 'next-auth/react';
 import { AdminSidebar } from './sidebar';
 import { AdminTopbar } from './topbar';
+import { AdminThemeProvider } from './theme';
 import { cn } from '@/lib/utils/cn';
 import type { CountryContext } from '@/lib/country/types';
 
@@ -58,48 +59,65 @@ export function AdminShell({
 
   const isCollapsed = ready && collapsed;
 
+  /*
+   * Portals render into <body>, outside this tree, so dialogs, menus and toasts
+   * would otherwise miss every `.admin-ui` rule. The class comes off again when
+   * the admin unmounts, which is what keeps the public site untouched.
+   */
+  React.useEffect(() => {
+    document.body.classList.add('admin-ui');
+    return () => document.body.classList.remove('admin-ui');
+  }, []);
+
   return (
     <SessionProvider>
-      <div className="min-h-screen bg-admin-workspace">
-        <a href="#admin-main" className="skip-link">
-          Skip to content
-        </a>
+      <AdminThemeProvider>
+        <div className="admin-ui min-h-screen bg-admin-workspace">
+          <a href="#admin-main" className="skip-link">
+            Skip to content
+          </a>
 
-        <AdminSidebar
-          permissions={user.permissions}
-          isSuperAdmin={user.isSuperAdmin}
-          siteName={branding.siteName}
-          logoUrl={branding.logoUrl}
-          logoDarkUrl={branding.logoDarkUrl}
-          open={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          collapsed={isCollapsed}
-          onToggleCollapsed={toggleCollapsed}
-        />
-
-        <div
-          className={cn(
-            'transition-[padding] duration-200 ease-out',
-            isCollapsed ? 'lg:pl-[4.5rem]' : 'lg:pl-64',
-          )}
-        >
-          <AdminTopbar
-            user={{
-              name: user.name,
-              email: user.email,
-              roleName: user.roleName,
-            }}
+          <AdminSidebar
             permissions={user.permissions}
             isSuperAdmin={user.isSuperAdmin}
-            country={country}
-            countries={countries}
-            onOpenSidebar={() => setSidebarOpen(true)}
+            siteName={branding.siteName}
+            logoUrl={branding.logoUrl}
+            logoDarkUrl={branding.logoDarkUrl}
+            open={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+            collapsed={isCollapsed}
+            onToggleCollapsed={toggleCollapsed}
           />
-          <main id="admin-main" className="mx-auto w-full max-w-[100rem] px-4 py-6 sm:px-6 sm:py-8">
-            {children}
-          </main>
+
+          {/* The rail floats 12px in from the edge, so the content clears its
+            width plus that gap on both sides. */}
+          <div
+            className={cn(
+              'transition-[padding] duration-200 ease-out',
+              isCollapsed ? 'lg:pl-[6.25rem]' : 'lg:pl-[17.5rem]',
+            )}
+          >
+            <AdminTopbar
+              user={{
+                name: user.name,
+                email: user.email,
+                roleName: user.roleName,
+              }}
+              permissions={user.permissions}
+              isSuperAdmin={user.isSuperAdmin}
+              country={country}
+              countries={countries}
+              onOpenSidebar={() => setSidebarOpen(true)}
+            />
+            <main
+              id="admin-main"
+              className="mx-auto w-full max-w-[100rem] px-4 py-6 sm:px-6 sm:py-8"
+            >
+              {children}
+            </main>
+          </div>
         </div>
-      </div>
+      </AdminThemeProvider>
     </SessionProvider>
   );
 }

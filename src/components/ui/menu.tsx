@@ -50,7 +50,7 @@ export function Menu({
       if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
 
       const items = panelRef.current?.querySelectorAll<HTMLElement>(
-        '[role="menuitem"]:not([disabled])',
+        '[role="menuitem"]:not([disabled]),[role="menuitemradio"]:not([disabled])',
       );
       if (!items || items.length === 0) return;
       event.preventDefault();
@@ -97,7 +97,9 @@ export function Menu({
           onClick={() => setOpen(false)}
           className={cn(
             'absolute top-full z-dropdown mt-1.5 animate-slide-up overflow-hidden rounded-xl border border-hairline',
-            'bg-surface p-1.5 shadow-xl',
+            // `glass-menu` only takes effect inside the admin (`.admin-ui`); the
+            // public site keeps the plain surface.
+            'glass-menu bg-surface p-1.5 shadow-xl',
             width,
             align === 'right' ? 'right-0' : 'left-0',
           )}
@@ -117,6 +119,7 @@ export function MenuItem({
   tone,
   icon,
   external,
+  checked,
 }: {
   children: React.ReactNode;
   href?: string;
@@ -125,9 +128,11 @@ export function MenuItem({
   tone?: 'danger';
   icon?: React.ReactNode;
   external?: boolean;
+  /** Makes the item one of a set of radio choices (a theme picker). */
+  checked?: boolean;
 }) {
   const className = cn(
-    'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors',
+    'flex min-h-9 w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left text-sm transition-colors',
     'focus-visible:outline-none focus-visible:bg-muted/10',
     tone === 'danger' ? 'text-red-600 hover:bg-red-50' : 'text-content hover:bg-muted/[0.08]',
     disabled && 'pointer-events-none opacity-50',
@@ -150,7 +155,8 @@ export function MenuItem({
   return (
     <button
       type="button"
-      role="menuitem"
+      role={checked === undefined ? 'menuitem' : 'menuitemradio'}
+      aria-checked={checked}
       onClick={onClick}
       disabled={disabled}
       className={className}

@@ -1,0 +1,285 @@
+/*
+  Admin design system.
+
+  Everything in this file is scoped under `.admin-ui`, the class the admin
+  shell sets on its root element and on <body> while it is mounted (so dialogs,
+  menus and toasts portalled to <body> inherit it too). The public site never
+  carries that class, so nothing here can change how it looks.
+
+  The rules are deliberately unlayered — outside Tailwind's @layer blocks and
+  loaded after globals.css — and written as `.admin-ui .x`, so they win over a
+  single utility class without `!important`.
+
+  Colours are channel triples (`R G B`), so alpha is applied where a colour is
+  used: `rgb(var(--token) / 0.5)`.
+*/
+
+/* -------------------------------------------------------------------------
+ * 1. Tokens
+ * ---------------------------------------------------------------------- */
+
+.admin-ui {
+  /* Text, surfaces, borders */
+  --text: 17 24 39;
+  --text-muted: 99 104 115;
+  --border: 229 231 235;
+  --surface: 255 255 255;
+  --surface-soft: 250 250 251;
+  --workspace-bg: 245 246 248;
+
+  /* The primary action is near-black, not the brand colour. The brand colour
+     is the accent only: active nav, the selected tab, focus rings, links. */
+  --primary: 17 17 17;
+  --primary-fg: 255 255 255;
+  --accent: var(--brand-primary);
+
+  /* Navigation, derived from one foreground */
+  --nav-fg: 17 24 39;
+  --nav-hover: rgb(17 24 39 / 0.05);
+  --nav-active: rgb(17 24 39 / 0.07);
+  --nav-guide: rgb(17 24 39 / 0.1);
+
+  /* Glass: two channels retune the whole glass family per theme */
+  --glass-tint: 255 255 255;
+  --shadow-ink: 15 23 42;
+
+  /* Radius */
+  --radius-shell: 24px;
+  --radius-card: 18px;
+  --radius-card-sm: 14px;
+  --radius-control: 12px;
+  --radius-menu: 14px;
+  --radius-dialog: 20px;
+
+  /* Depth: a border plus a soft shadow, never a heavy drop shadow */
+  --shadow-sm: 0 1px 2px rgb(17 24 39 / 0.04), 0 1px 3px rgb(17 24 39 / 0.03);
+  --shadow-md: 0 2px 6px rgb(17 24 39 / 0.04), 0 10px 28px rgb(17 24 39 / 0.06);
+  --shadow-lg: 0 6px 16px rgb(17 24 39 / 0.06), 0 28px 64px rgb(17 24 39 / 0.12);
+
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto,
+    sans-serif;
+
+  /*
+    Re-point the app's generic tokens, so every existing admin screen written
+    with `text-content`, `text-muted`, `border-hairline` and `bg-surface` picks
+    the system up without any markup change.
+  */
+  --brand-text: var(--text);
+  --brand-muted: var(--text-muted);
+  --brand-border: var(--border);
+  --brand-background: var(--surface);
+
+  /* The shell's own tokens, which the sidebar and topbar classes read. */
+  --admin-nav-fg: var(--nav-fg);
+  --admin-sidebar-bg: var(--surface);
+  --admin-header-bg: var(--surface);
+  --admin-workspace-bg: var(--workspace-bg);
+
+  /* One calm type system for the whole admin, whatever the public site uses. */
+  --font-heading: var(--font);
+  --font-body: var(--font);
+  --font-heading-weight: 700;
+  --font-body-weight: 400;
+  --font-heading-leading: 1.2;
+  --font-body-leading: 1.5;
+  --font-heading-tracking: -0.02em;
+  --font-body-tracking: 0em;
+
+  font-family: var(--font);
+  color: rgb(var(--text));
+}
+
+body.admin-ui {
+  background-color: rgb(var(--workspace-bg));
+}
+
+/* -------------------------------------------------------------------------
+ * 2. Liquid Glass
+ *
+ * Glass is for chrome (sidebar, topbar, menus, KPI cards, filter bars and the
+ * dashboard's overview panels). Dense work areas — tables, long forms,
+ * editors — stay solid.
+ * ---------------------------------------------------------------------- */
+
+/* Topbar: the strongest glass */
+.admin-ui .glass-bar {
+  background: rgb(var(--glass-tint) / 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgb(var(--glass-tint) / 0.7);
+  box-shadow:
+    0 1px 2px rgb(var(--shadow-ink) / 0.04),
+    0 8px 24px rgb(var(--shadow-ink) / 0.06),
+    inset 0 1px 0 rgb(var(--glass-tint) / 0.8);
+}
+
+/* Sidebar rail */
+.admin-ui .glass-rail {
+  background: rgb(var(--glass-tint) / 0.68);
+  backdrop-filter: blur(22px) saturate(170%);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  border: 1px solid rgb(var(--glass-tint) / 0.7);
+  box-shadow:
+    0 1px 2px rgb(var(--shadow-ink) / 0.04),
+    0 12px 32px rgb(var(--shadow-ink) / 0.06),
+    inset 0 1px 0 rgb(var(--glass-tint) / 0.8);
+}
+
+/* KPI cards, filter bars */
+.admin-ui .glass-card {
+  background: rgb(var(--glass-tint) / 0.7);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  border: 1px solid rgb(var(--glass-tint) / 0.75);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgb(var(--glass-tint) / 0.85);
+}
+
+/* Menus and popovers: the most opaque, since they sit over anything */
+.admin-ui .glass-menu {
+  background: rgb(var(--glass-tint) / 0.86);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid rgb(var(--border) / 0.9);
+  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-menu);
+}
+
+/* Overview panels on the dashboard (`<Card glass>`) */
+.admin-ui .glass-panel {
+  background: linear-gradient(
+    180deg,
+    rgb(var(--glass-tint) / 0.66),
+    rgb(var(--glass-tint) / 0.44)
+  );
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-color: rgb(var(--glass-tint) / 0.75);
+  box-shadow:
+    0 1px 2px rgb(var(--shadow-ink) / 0.04),
+    0 14px 36px rgb(var(--shadow-ink) / 0.06),
+    inset 0 1px 0 rgb(var(--glass-tint) / 0.9);
+}
+.admin-ui .glass-panel .border-hairline,
+.admin-ui .glass-panel .divide-hairline > * + * {
+  border-color: rgb(var(--border) / 0.55);
+}
+
+/* Tiles and quick-action buttons inside a glass panel */
+.admin-ui .glass-chip {
+  background-color: rgb(var(--glass-tint) / 0.42);
+  box-shadow: inset 0 1px 0 rgb(var(--glass-tint) / 0.7);
+}
+.admin-ui .glass-chip:hover {
+  background-color: rgb(var(--glass-tint) / 0.85);
+}
+
+/* Fallbacks: no blur support, or the visitor asked for less transparency */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .admin-ui .glass-bar,
+  .admin-ui .glass-rail,
+  .admin-ui .glass-card,
+  .admin-ui .glass-menu,
+  .admin-ui .glass-panel {
+    background: rgb(var(--glass-tint) / 0.97);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .admin-ui .glass-bar,
+  .admin-ui .glass-rail,
+  .admin-ui .glass-card,
+  .admin-ui .glass-menu,
+  .admin-ui .glass-panel {
+    background: rgb(var(--glass-tint) / 0.97);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/*
+  Glass needs colour behind it — over a flat grey page it just reads as white.
+  The dashboard paints a fixed, decorative wash behind its content.
+*/
+.admin-ui .dashboard {
+  position: relative;
+  isolation: isolate;
+}
+.admin-ui .ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(44rem 34rem at 12% 8%, rgb(var(--accent) / 0.24), transparent 62%),
+    radial-gradient(38rem 30rem at 88% 14%, rgb(139 92 246 / 0.2), transparent 62%),
+    radial-gradient(46rem 34rem at 62% 96%, rgb(20 184 166 / 0.17), transparent 62%),
+    radial-gradient(30rem 24rem at 30% 62%, rgb(236 72 153 / 0.1), transparent 62%);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .admin-ui .ambient {
+    display: none;
+  }
+}
+
+/* -------------------------------------------------------------------------
+ * 3. Shell
+ * ---------------------------------------------------------------------- */
+
+/*
+  The topbar's sticky wrapper fades the page colour in behind the bar, so
+  content scrolling under it dissolves rather than showing a hard edge.
+*/
+.admin-ui .topbar-fade {
+  background: linear-gradient(
+    to bottom,
+    rgb(var(--workspace-bg)) 0%,
+    rgb(var(--workspace-bg) / 0.85) 60%,
+    rgb(var(--workspace-bg) / 0) 100%
+  );
+}
+/* Over the dashboard's wash that strip would show as a grey band, so there it
+   becomes a masked blur instead. */
+.admin-ui:has(.dashboard) .topbar-fade {
+  background: none;
+}
+.admin-ui:has(.dashboard) .topbar-fade::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  mask-image: linear-gradient(to bottom, #000 55%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);
+}
+
+/* Navigation item states */
+.admin-ui .nav-item:hover {
+  background-color: var(--nav-hover);
+}
+.admin-ui .nav-item[data-active='true'] {
+  background-color: var(--nav-active);
+}
+.admin-ui .nav-guide {
+  border-color: var(--nav-guide);
+}
+
+/* The dim, blurred layer behind the mobile drawer and the command palette */
+.admin-ui .admin-scrim {
+  background-color: rgb(var(--shadow-ink) / 0.32);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* Focus: a visible accent ring on every interactive element */
+.admin-ui .admin-focus {
+  --tw-ring-color: rgb(var(--accent) / 0.6);
+  --tw-ring-offset-color: rgb(var(--surface));
+}
+.admin-ui .admin-scroll {
+  scrollbar-color: rgb(var(--nav-fg) / 0.16) transparent;
+}
+
+/* Logos: when a dark-surface logo exists, both are rendered and CSS swaps them */
+.admin-ui .logo-dark {
+  display: none;
+}

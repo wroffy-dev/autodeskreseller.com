@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
 import { signOut } from 'next-auth/react';
 import {
   PanelLeft,
@@ -20,7 +19,8 @@ import { cn } from '@/lib/utils/cn';
 import { AdminSearch } from './admin-search';
 import { AdminBreadcrumbs } from './breadcrumbs';
 import { AdminCountrySwitcher } from './country-switcher';
-import { Menu, MenuItem, MenuSeparator } from '@/components/ui/menu';
+import { Menu, MenuItem, MenuLabel, MenuSeparator } from '@/components/ui/menu';
+import { ThemeMenuItems, ThemeToggle, useAdminTheme } from './theme';
 import type { CountryContext } from '@/lib/country/types';
 
 /** Create shortcuts, each gated by the permission its destination requires. */
@@ -65,125 +65,163 @@ export function AdminTopbar({
   const can = (permission: PermissionKey) => isSuperAdmin || permissions.includes(permission);
   const createOptions = QUICK_CREATE.filter((option) => can(option.permission));
 
+  const { preference, setPreference } = useAdminTheme();
+
   return (
-    <header className="sticky top-0 z-topbar border-b border-admin-nav/10 bg-admin-header text-admin-nav">
-      <div className="flex h-16 items-center gap-2 px-4 sm:gap-3 sm:px-6">
-        <button
-          type="button"
-          onClick={onOpenSidebar}
-          aria-label="Open navigation"
-          aria-controls="admin-sidebar"
-          className="admin-focus admin-focus-header -ml-1 rounded-lg p-2 text-admin-nav/70 transition-colors hover:bg-admin-nav/[0.08] hover:text-admin-nav lg:hidden"
-        >
-          <PanelLeft className="h-5 w-5" />
-        </button>
+    // The sticky wrapper fades the workspace colour in behind the floating bar,
+    // so content scrolling under it dissolves instead of meeting a hard edge.
+    <header className="topbar-fade sticky top-0 z-topbar px-3 pb-3 pt-3 sm:px-4 lg:pl-0 lg:pr-3">
+      <div className="relative mx-auto max-w-[100rem] text-admin-nav">
+        {/* The glass is a layer behind the bar rather than the bar itself: an
+            element with a backdrop filter traps `fixed` descendants (the
+            command palette) and blurs only its own box for nested glass (the
+            menus), so neither may live inside it. */}
+        <div
+          aria-hidden="true"
+          className="glass-bar pointer-events-none absolute inset-0 rounded-[20px] sm:rounded-[var(--radius-shell)]"
+        />
 
-        {/* Breadcrumbs take the space on desktop; search owns it on mobile. */}
-        <div className="hidden min-w-0 flex-1 lg:block">
-          <AdminBreadcrumbs />
-        </div>
+        <div className="relative flex h-14 items-center gap-1.5 px-2 sm:h-16 sm:gap-2 sm:px-3">
+          <button
+            type="button"
+            onClick={onOpenSidebar}
+            aria-label="Open navigation"
+            title="Open navigation"
+            aria-controls="admin-sidebar"
+            className="admin-focus flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-admin-nav/70 transition-colors hover:bg-admin-nav/[0.06] hover:text-admin-nav lg:hidden"
+          >
+            <PanelLeft className="h-5 w-5" />
+          </button>
 
-        <div className="min-w-0 flex-1 lg:max-w-xs lg:flex-none">
-          <AdminSearch permissions={permissions} isSuperAdmin={isSuperAdmin} />
-        </div>
+          {/* Breadcrumbs take the space on desktop; search owns it on mobile. */}
+          <div className="hidden min-w-0 flex-1 pl-2 lg:block">
+            <AdminBreadcrumbs />
+          </div>
 
-        <AdminCountrySwitcher current={country} countries={countries} />
+          <div className="min-w-0 flex-1 lg:max-w-xs lg:flex-none xl:w-80 xl:max-w-none">
+            <AdminSearch permissions={permissions} isSuperAdmin={isSuperAdmin} />
+          </div>
 
-        {createOptions.length > 0 ? (
+          <AdminCountrySwitcher current={country} countries={countries} />
+
+          {createOptions.length > 0 ? (
+            <Menu
+              align="right"
+              triggerClassName="admin-focus rounded-[var(--radius-control)]"
+              trigger={
+                <span
+                  className={cn(
+                    'inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] px-2.5 text-sm font-medium sm:px-3',
+                    'bg-[rgb(var(--primary))] text-[rgb(var(--primary-fg))] shadow-sm transition-colors hover:bg-[rgb(var(--primary)/0.86)]',
+                  )}
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  <span className="hidden sm:inline">Create</span>
+                  <ChevronDown
+                    className="hidden h-3.5 w-3.5 opacity-70 sm:block"
+                    aria-hidden="true"
+                  />
+                </span>
+              }
+              label="Create new"
+            >
+              {createOptions.map((option) => (
+                <MenuItem key={option.href} href={option.href}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </Menu>
+          ) : null}
+
+          {/* On phones the theme choice lives in the profile menu instead. */}
+          <div className="hidden sm:block">
+            <ThemeToggle />
+          </div>
+
+          <a
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="View website (opens in a new tab)"
+            title="View website"
+            className="admin-focus hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl text-admin-nav/70 transition-colors hover:bg-admin-nav/[0.06] hover:text-admin-nav sm:flex"
+          >
+            <ExternalLink className="h-[1.1rem] w-[1.1rem]" aria-hidden="true" />
+          </a>
+
           <Menu
             align="right"
-            triggerClassName="admin-focus admin-focus-header"
+            label="Account menu"
+            triggerClassName="admin-focus rounded-xl"
             trigger={
-              <span
-                className={cn(
-                  'inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand px-3 text-sm font-medium text-white',
-                  'shadow-sm transition-colors hover:bg-brand/90',
+              <span className="flex items-center gap-2 rounded-xl px-1 py-1 transition-colors hover:bg-admin-nav/[0.06] xl:pr-2">
+                {user.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- storage URL, may be any host
+                  <img
+                    src={user.image}
+                    alt=""
+                    className="h-8 w-8 rounded-full object-cover ring-1 ring-admin-nav/10"
+                  />
+                ) : (
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[rgb(var(--primary))] text-xs font-semibold text-[rgb(var(--primary-fg))]">
+                    {initials(user.name)}
+                  </span>
                 )}
-              >
-                <Plus className="h-4 w-4" aria-hidden="true" />
-                <span className="hidden sm:inline">Create</span>
+                <span className="hidden text-left xl:block">
+                  <span className="block max-w-[9rem] truncate text-sm font-medium leading-tight text-admin-nav">
+                    {user.name}
+                  </span>
+                  <span className="block text-xs leading-tight text-admin-nav/55">
+                    {user.roleName}
+                  </span>
+                </span>
                 <ChevronDown
-                  className="hidden h-3.5 w-3.5 opacity-80 sm:block"
+                  className="hidden h-4 w-4 text-admin-nav/50 xl:block"
                   aria-hidden="true"
                 />
               </span>
             }
-            label="Create new"
           >
-            {createOptions.map((option) => (
-              <MenuItem key={option.href} href={option.href}>
-                {option.label}
-              </MenuItem>
-            ))}
-          </Menu>
-        ) : null}
-
-        <Menu
-          align="right"
-          label="Account menu"
-          triggerClassName="admin-focus admin-focus-header"
-          trigger={
-            <span className="flex items-center gap-2 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-admin-nav/[0.08]">
-              {user.image ? (
-                // eslint-disable-next-line @next/next/no-img-element -- storage URL, may be any host
-                <img
-                  src={user.image}
-                  alt=""
-                  className="h-8 w-8 rounded-full object-cover ring-1 ring-admin-nav/20"
-                />
-              ) : (
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">
-                  {initials(user.name)}
-                </span>
-              )}
-              <span className="hidden text-left xl:block">
-                <span className="block max-w-[9rem] truncate text-sm font-medium leading-tight text-admin-nav">
-                  {user.name}
-                </span>
-                <span className="block text-xs leading-tight text-admin-nav/60">
-                  {user.roleName}
-                </span>
-              </span>
-              <ChevronDown
-                className="hidden h-4 w-4 text-admin-nav/60 xl:block"
-                aria-hidden="true"
-              />
-            </span>
-          }
-        >
-          <div className="border-b border-hairline px-3 py-2.5">
-            <p className="truncate text-sm font-medium text-content">{user.name}</p>
-            <p className="truncate text-xs text-muted">{user.email}</p>
-            <p className="mt-1 text-xs text-muted">{user.roleName}</p>
-          </div>
-          <MenuItem href="/admin/profile" icon={<UserCircle className="h-4 w-4" />}>
-            My profile
-          </MenuItem>
-          <MenuItem href="/admin/profile?tab=security" icon={<ShieldCheck className="h-4 w-4" />}>
-            Security
-          </MenuItem>
-          <MenuSeparator />
-          <MenuItem href="/" external icon={<ExternalLink className="h-4 w-4" />}>
-            View website
-          </MenuItem>
-          {isSuperAdmin || permissions.includes('staff.manage') ? (
-            <MenuItem href="/admin/staff" icon={<User className="h-4 w-4" />}>
-              Staff & roles
+            <div className="border-b border-hairline px-3 py-2.5">
+              <p className="truncate text-sm font-medium text-content">{user.name}</p>
+              <p className="truncate text-xs text-muted">{user.email}</p>
+              <p className="mt-1 text-xs text-muted">{user.roleName}</p>
+            </div>
+            <MenuItem href="/admin/profile" icon={<UserCircle className="h-4 w-4" />}>
+              My profile
             </MenuItem>
-          ) : null}
-          <MenuSeparator />
-          <MenuItem
-            tone="danger"
-            icon={<LogOut className="h-4 w-4" />}
-            onClick={() => signOut({ callbackUrl: LOGIN_PATH })}
-          >
-            Sign out
-          </MenuItem>
-        </Menu>
+            <MenuItem href="/admin/profile?tab=security" icon={<ShieldCheck className="h-4 w-4" />}>
+              Security
+            </MenuItem>
+            {/* The topbar toggle is hidden on phones, so the theme lives here. */}
+            <div className="sm:hidden">
+              <MenuSeparator />
+              <MenuLabel>Theme</MenuLabel>
+              <ThemeMenuItems preference={preference} onSelect={setPreference} />
+            </div>
+            <MenuSeparator />
+            <MenuItem href="/" external icon={<ExternalLink className="h-4 w-4" />}>
+              View website
+            </MenuItem>
+            {isSuperAdmin || permissions.includes('staff.manage') ? (
+              <MenuItem href="/admin/staff" icon={<User className="h-4 w-4" />}>
+                Staff & roles
+              </MenuItem>
+            ) : null}
+            <MenuSeparator />
+            <MenuItem
+              tone="danger"
+              icon={<LogOut className="h-4 w-4" />}
+              onClick={() => signOut({ callbackUrl: LOGIN_PATH })}
+            >
+              Sign out
+            </MenuItem>
+          </Menu>
+        </div>
       </div>
 
       {/* Breadcrumbs move below the bar on small screens so they stay readable. */}
-      <div className="border-t border-admin-nav/10 px-4 py-2 lg:hidden">
+      <div className="px-2 pt-2.5 lg:hidden">
         <AdminBreadcrumbs />
       </div>
     </header>

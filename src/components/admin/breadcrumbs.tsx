@@ -9,9 +9,9 @@ import { cn } from '@/lib/utils/cn';
 /**
  * Breadcrumbs derived from the navigation tree.
  *
- * Rendered only inside the admin's dark top bar, so the colours are the shell's
- * rather than the page's: muted white for the trail, full white for the page
- * you are on.
+ * Rendered only inside the admin's top bar, so the colours are the shell's
+ * rather than the page's: the muted nav foreground for the trail, the full one
+ * for the page you are on.
  *
  * Because the trail comes from ADMIN_NAV, a page never has to restate where it
  * lives — moving an item between modules updates every breadcrumb for free.
