@@ -116,7 +116,7 @@ export default async function ReportsPage({
         actions={<DateRangeFilter from={range.from} to={range.to} />}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatCard label="Leads in range" value={total} />
         <StatCard label="Won" value={won} tone="success" />
         <StatCard label="Lost" value={lost} tone="danger" />

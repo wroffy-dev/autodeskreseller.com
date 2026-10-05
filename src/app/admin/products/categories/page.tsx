@@ -51,7 +51,7 @@ export default async function ProductCategories() {
   }));
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="max-w-4xl">
       <AdminPageHeader
         title="Product categories"
         description="Group plans so a product block can pull “everything in this category”."

@@ -163,7 +163,7 @@ export default async function EditProduct({ params }: { params: Promise<{ id: st
   );
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="max-w-3xl">
       <AdminPageHeader
         title={product.name}
         description={`${product._count.leads} lead(s) attributed to this product`}

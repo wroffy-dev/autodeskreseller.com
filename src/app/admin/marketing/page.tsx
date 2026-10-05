@@ -53,7 +53,7 @@ export default async function MarketingAdmin() {
   }));
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="max-w-5xl">
       <AdminPageHeader
         title="Marketing & tracking"
         description="Analytics, advertising tags and consent. UTM parameters are captured automatically on every visit."

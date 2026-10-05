@@ -24,7 +24,7 @@ export default async function NewLead() {
   ]);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="max-w-3xl">
       <AdminPageHeader
         title="Add a lead"
         description="For enquiries that arrive by phone, email or at an event."

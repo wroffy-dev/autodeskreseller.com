@@ -51,7 +51,7 @@ export default async function PopupsAdmin() {
   }));
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="max-w-5xl">
       <AdminPageHeader
         title="Popups"
         description="Timed, scroll and exit-intent popups. Each one is capped per visitor by its frequency setting."

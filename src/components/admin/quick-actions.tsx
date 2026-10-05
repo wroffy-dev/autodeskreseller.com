@@ -61,16 +61,18 @@ export function QuickActions({ can }: { can: (permission: PermissionKey) => bool
   if (visible.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+    <div className="grid grid-cols-2 gap-2">
       {visible.map((action) => (
         <Link
           key={action.href}
           href={action.href}
           {...(action.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
           className={cn(
-            'flex items-center gap-2.5 rounded-lg border border-hairline bg-surface px-3 py-2.5',
+            // `glass-chip` turns the tile translucent on the dashboard's glass
+            // panel; elsewhere it is an ordinary surface tile.
+            'glass-chip group flex min-w-0 items-center gap-2.5 rounded-[var(--radius-card-sm)] border border-hairline bg-surface px-3 py-2.5',
             'text-sm font-medium text-content transition-colors',
-            'hover:border-brand/40 hover:bg-brand/[0.03] hover:text-brand',
+            'hover:border-brand/40 hover:text-brand',
           )}
         >
           <span className="shrink-0 text-muted transition-colors group-hover:text-brand">

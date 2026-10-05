@@ -50,7 +50,7 @@ export default async function CampaignsPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="max-w-4xl">
       <AdminPageHeader
         title="UTM campaigns"
         description="Build a tagged link so you can see exactly which campaign brought each lead."

@@ -160,7 +160,7 @@ export default async function EditPage({ params }: { params: Promise<{ id: strin
           <PageWorkspace pageId={page.id} initialSections={sections} canEdit={canEdit} />
         }
         settings={
-          <div className="mx-auto max-w-3xl">
+          <div className="max-w-3xl">
             <PageForm
               initial={initial}
               categories={categoryOptions}

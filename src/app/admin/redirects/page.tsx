@@ -25,7 +25,7 @@ export default async function RedirectsAdmin() {
   }));
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="max-w-4xl">
       <AdminPageHeader
         title="Redirects"
         description="Applied to any address that would otherwise 404 — a page, a product, an article, a category. Loops are rejected when you save."

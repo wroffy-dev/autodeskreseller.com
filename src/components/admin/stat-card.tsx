@@ -93,7 +93,11 @@ export function StatCard({
           {typeof value === 'number' ? formatNumber(value) : value}
         </p>
         {sparkline && sparkline.length > 1 ? (
-          <Sparkline values={sparkline} className={cn('mb-1.5 shrink-0', SPARK_TONE[tone])} />
+          // Hidden on phones, where two tiles share a row and the value needs the room.
+          <Sparkline
+            values={sparkline}
+            className={cn('mb-1.5 hidden shrink-0 sm:block', SPARK_TONE[tone])}
+          />
         ) : null}
       </div>
 

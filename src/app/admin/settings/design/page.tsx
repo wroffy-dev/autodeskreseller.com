@@ -38,7 +38,7 @@ export default async function WebsiteDesignAdmin() {
   ) as Record<string, string | boolean>;
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="max-w-4xl">
       <AdminPageHeader
         title="Website design"
         description="Colours, fonts, buttons, layout, the header and the footer. Every CMS section can override these individually."

@@ -36,8 +36,9 @@ export function AdminBreadcrumbs({ leaf, className }: { leaf?: string; className
 
   return (
     <nav aria-label="Breadcrumb" className={cn('min-w-0', className)}>
-      <ol className="flex flex-wrap items-center gap-1.5 text-xs text-admin-nav/60">
-        <li>
+      {/* One line: a long trail truncates rather than doubling the bar's height. */}
+      <ol className="flex min-w-0 items-center gap-1.5 text-xs text-admin-nav/60">
+        <li className="shrink-0">
           <Link
             href="/admin"
             className="admin-focus admin-focus-header rounded transition-colors hover:text-admin-nav"

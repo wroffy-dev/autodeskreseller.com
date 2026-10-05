@@ -23,7 +23,7 @@ export default async function NewStaff() {
   });
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="max-w-3xl">
       <AdminPageHeader
         title="Add a staff account"
         description="They can sign in immediately with the password you set."

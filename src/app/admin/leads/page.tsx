@@ -413,7 +413,7 @@ export default async function LeadsAdmin({
         }
       />
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4 min-[1800px]:grid-cols-7">
         <StatCard label="Total" value={totalLeads} href={`/admin/leads${countryQuery('')}`} />
         <StatCard label="New" value={counts.NEW ?? 0} tone="brand" href={`/admin/leads${countryQuery('status=NEW')}`} />
         <StatCard

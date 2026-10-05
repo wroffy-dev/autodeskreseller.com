@@ -15,7 +15,7 @@ export default async function BackupsAdmin() {
   const data = await getBackupDashboard();
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="max-w-6xl space-y-4">
       <AdminPageHeader
         title="Backup & restore"
         description="Take a copy of the database and media library, keep it somewhere safe, and put it back when something goes wrong."
