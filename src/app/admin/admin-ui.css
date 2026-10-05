@@ -392,3 +392,103 @@ body.admin-ui {
 .admin-ui fieldset {
   min-inline-size: 0;
 }
+
+/* -------------------------------------------------------------------------
+ * 6. Dark theme
+ *
+ * Applied by `data-admin-theme="dark"` on <html> (see src/lib/admin/theme.ts).
+ * Scoped under `.admin-ui` like everything else, so the public site never
+ * changes. The tinted status utilities (bg-red-50 and friends) are mapped in
+ * admin-dark.generated.css.
+ * ---------------------------------------------------------------------- */
+
+:root[data-admin-theme='dark'] .admin-ui {
+  color-scheme: dark;
+  --text: 236 237 240;
+  --text-muted: 156 163 175;
+  --border: 46 51 61;
+  --surface: 26 29 35;
+  --surface-soft: 32 36 43;
+  --workspace-bg: 14 16 20;
+  /* The primary action inverts to near-white */
+  --primary: 245 245 247;
+  --primary-fg: 17 17 17;
+  --nav-fg: 236 237 240;
+  --nav-hover: rgb(255 255 255 / 0.06);
+  --nav-active: rgb(255 255 255 / 0.08);
+  --nav-guide: rgb(255 255 255 / 0.1);
+  --glass-tint: 30 33 40;
+  --shadow-ink: 0 0 0;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4), 0 1px 3px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 2px 6px rgb(0 0 0 / 0.35), 0 10px 28px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 6px 16px rgb(0 0 0 / 0.4), 0 28px 64px rgb(0 0 0 / 0.55);
+}
+
+/* Dark glass: a light hairline and only a faint top highlight */
+:root[data-admin-theme='dark'] .admin-ui :is(.glass-bar, .glass-rail, .glass-card, .glass-panel) {
+  border-color: rgb(255 255 255 / 0.08);
+}
+:root[data-admin-theme='dark'] .admin-ui .glass-bar,
+:root[data-admin-theme='dark'] .admin-ui .glass-rail {
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.3),
+    0 12px 32px rgb(0 0 0 / 0.35),
+    inset 0 1px 0 rgb(255 255 255 / 0.05);
+}
+:root[data-admin-theme='dark'] .admin-ui .glass-card,
+:root[data-admin-theme='dark'] .admin-ui .ui-card.glass-panel {
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgb(255 255 255 / 0.05);
+}
+:root[data-admin-theme='dark'] .admin-ui .glass-menu {
+  border-color: rgb(255 255 255 / 0.1);
+}
+:root[data-admin-theme='dark'] .admin-ui .glass-chip {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+:root[data-admin-theme='dark'] .admin-ui .glass-chip:hover {
+  background-color: rgb(255 255 255 / 0.07);
+}
+
+/* The wash is quieter on a dark page, where saturated colour glows */
+:root[data-admin-theme='dark'] .admin-ui .ambient {
+  opacity: 0.7;
+}
+
+/* Hard-coded white surfaces become the dark surface — except a switch's knob
+   and anything previewing the public site, which must stay white. */
+:root[data-admin-theme='dark'] .admin-ui .bg-white:not(.ui-switch-knob):not(.ui-keep-white) {
+  background-color: rgb(var(--surface));
+}
+
+/* The input's chevron is drawn in a fixed grey that reads on both themes; the
+   control itself just needs the dark surface. */
+:root[data-admin-theme='dark'] .admin-ui .ui-control {
+  background-color: rgb(var(--surface-soft));
+}
+:root[data-admin-theme='dark'] .admin-ui .ui-control:disabled {
+  background-color: rgb(var(--surface));
+}
+
+/* A near-white primary needs a shade darker on hover, not lighter */
+:root[data-admin-theme='dark'] .admin-ui .ui-btn-primary:hover:not(:disabled) {
+  background-color: rgb(var(--primary) / 0.85);
+}
+
+/* Logos: swap to the dark-surface logo */
+:root[data-admin-theme='dark'] .admin-ui .logo-dark {
+  display: block;
+}
+:root[data-admin-theme='dark'] .admin-ui .logo-light {
+  display: none;
+}
+
+/* Scrollbars follow the theme */
+:root[data-admin-theme='dark'] .admin-ui .scroll-x::-webkit-scrollbar-thumb {
+  background-color: rgb(var(--border));
+}
+
+/* The brand colour is tuned for white pages; as text on a dark surface it can
+   fall below 4.5:1, so it is lifted towards white. Fills keep the real brand. */
+:root[data-admin-theme='dark'] .admin-ui :is(.text-brand, .hover\:text-brand:hover, .group:hover .group-hover\:text-brand) {
+  color: color-mix(in srgb, rgb(var(--brand-primary)) 62%, white);
+}

@@ -7,6 +7,7 @@ import { AdminShell } from '@/components/admin/admin-shell';
 import { ADMIN_THEME_SCRIPT } from '@/lib/admin/theme';
 // Every rule in here is scoped under `.admin-ui`, so it cannot reach the public site.
 import './admin-ui.css';
+import './admin-dark.generated.css';
 
 /**
  * Titles for the admin — but only for somebody who is actually in it.

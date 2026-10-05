@@ -26,7 +26,8 @@
     "verify:production": "node scripts/verify-production.mjs",
     "db:rehearse": "node scripts/rehearse-migration.mjs",
     "market:clone": "node scripts/clone-market.mjs",
-    "release": "node scripts/release.mjs"
+    "release": "node scripts/release.mjs",
+    "admin:dark-css": "node scripts/admin-dark-css.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
