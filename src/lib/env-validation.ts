@@ -131,6 +131,18 @@ export function collectEnvProblems(source: EnvSource = process.env): EnvProblem[
     });
   }
 
+  // --- Conditional: Deskzo CRM -------------------------------------------
+  // Off when neither key is set. Half a key pair is a mistake worth stopping
+  // for: every lead would quietly queue against a CRM it can never reach.
+  if (present('DESKZO_KEY_ID') || present('DESKZO_SECRET')) {
+    require('DESKZO_KEY_ID', 'is required when DESKZO_SECRET is set');
+    require('DESKZO_SECRET', 'is required when DESKZO_KEY_ID is set');
+  }
+  if (present('DESKZO_API_URL') && !/^https:\/\//i.test(source.DESKZO_API_URL!.trim())) {
+    // The key travels in every request's Authorization header.
+    problems.push({ variable: 'DESKZO_API_URL', problem: 'must be an https:// URL' });
+  }
+
   // --- Conditional: seeding ----------------------------------------------
   if (/^(1|true|yes|on)$/i.test((source.RUN_SEED || '').trim())) {
     problems.push(...collectSeedProblems(source));

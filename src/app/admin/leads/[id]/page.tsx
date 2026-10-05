@@ -9,6 +9,8 @@ import {
   type ConsentRecordView,
 } from '@/components/admin/leads/consent-panel';
 import { decimalToString } from '@/lib/utils/money';
+import { CrmSyncCard } from '@/components/admin/leads/crm-sync-card';
+import { deskzoEnabled } from '@/lib/crm/deskzo.service';
 
 export const dynamic = 'force-dynamic';
 
@@ -187,6 +189,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       }
     : null;
 
+  const crmConfigured = deskzoEnabled();
   const submission = lead.submissions[0] ?? null;
   const labels = (submission?.fieldLabels ?? {}) as Record<string, string>;
   const submittedFields = submission
@@ -237,6 +240,25 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             }}
             canManage={userCan(user, 'leads.manageConsent')}
           />
+        }
+        crm={
+          // Nothing to say on a deployment without the integration about a
+          // lead that never went near it.
+          crmConfigured || lead.crmSyncStatus ? (
+            <CrmSyncCard
+              leadId={lead.id}
+              configured={crmConfigured}
+              canSend={userCan(user, 'leads.edit')}
+              sync={{
+                status: lead.crmSyncStatus,
+                reference: lead.crmReference,
+                syncedAt: lead.crmSyncedAt?.toISOString() ?? null,
+                lastError: lead.crmLastError,
+                attempts: lead.crmSyncAttempts,
+                nextAttemptAt: lead.crmNextAttemptAt?.toISOString() ?? null,
+              }}
+            />
+          ) : null
         }
       />
     </>

@@ -6,6 +6,7 @@ import { prisma } from '@/lib/db/prisma';
 import { authorize, userCan } from '@/lib/auth/guards';
 import { recordAudit } from '@/lib/services/audit';
 import { logLeadActivity, notifyLeadAssignment } from '@/lib/services/leads';
+import { initialCrmSyncFields, syncNewLead } from '@/lib/crm/deskzo.service';
 import {
   leadInputSchema,
   leadNoteSchema,
@@ -67,6 +68,7 @@ export async function createLead(formData: FormData): Promise<ActionResult<{ id:
         followUpAt: input.followUpAt,
         lostReason: input.lostReason,
         value: toDecimal(input.value),
+        ...initialCrmSyncFields(),
       },
     });
 
@@ -83,6 +85,8 @@ export async function createLead(formData: FormData): Promise<ActionResult<{ id:
       entityId: lead.id,
       summary: `Created lead “${lead.name}”`,
     });
+
+    syncNewLead(lead.id);
 
     revalidateCrm();
     return success({ id: lead.id }, 'Lead created.');

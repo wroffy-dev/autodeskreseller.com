@@ -84,6 +84,7 @@ export function LeadDetail({
   can,
   submission,
   consent,
+  crm,
 }: {
   lead: LeadDetailData;
   staff: Array<{ id: string; name: string }>;
@@ -93,6 +94,8 @@ export function LeadDetail({
   submission?: SubmissionView | null;
   /** Rendered by the page so the IP never reaches a viewer without the right. */
   consent?: React.ReactNode;
+  /** The lead's place in the Deskzo CRM, rendered by the page. */
+  crm?: React.ReactNode;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -309,6 +312,8 @@ export function LeadDetail({
             <Row label="Referrer" value={lead.referrer ?? '—'} />
           </CardBody>
         </Card>
+
+        {crm}
 
         <Card>
           <CardHeader title="Attribution" description="Last touch, then first touch." />

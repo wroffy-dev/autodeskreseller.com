@@ -222,6 +222,18 @@ enum DeviceTarget {
   MOBILE
 }
 
+/// The push of a lead to the Deskzo CRM.
+enum CrmSyncStatus {
+  /// Waiting to be sent, or to be retried after a temporary failure.
+  PENDING
+  /// Deskzo created the lead (or already had it, by external_id).
+  SYNCED
+  /// Deskzo accepted it but routed it to a reseller instead of creating a lead.
+  ROUTED
+  /// Deskzo refused it, or every retry failed. Needs a person.
+  FAILED
+}
+
 enum LeadActivityType {
   CREATED
   STATUS_CHANGED
@@ -1721,6 +1733,20 @@ model Lead {
   lostReason String?   @db.Text
   value      Decimal?  @db.Decimal(12, 2)
 
+  // --- Deskzo CRM sync ---
+  /// Where this lead stands in the push to the Deskzo CRM. Null when it was
+  /// never queued: the integration was off when it arrived, or it predates it.
+  crmSyncStatus    CrmSyncStatus?
+  /// Deskzo's own id and reference (LEAD-000481) once it has accepted the lead.
+  crmLeadId        String?
+  crmReference     String?
+  crmSyncAttempts  Int            @default(0)
+  /// When a PENDING lead is next due to be sent; the retry queue reads this.
+  crmNextAttemptAt DateTime?
+  crmSyncedAt      DateTime?
+  /// The last refusal or failure, in words, for whoever looks at the lead.
+  crmLastError     String?        @db.Text
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -1750,6 +1776,7 @@ model Lead {
   @@index([blogPostId])
   @@index([countryId, createdAt])
   @@index([countryId, status])
+  @@index([crmSyncStatus, crmNextAttemptAt])
 }
 
 model LeadNote {

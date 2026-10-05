@@ -80,6 +80,11 @@ const serverSchema = z.object({
   BACKUP_ENCRYPTION_KEY: z.string().optional(),
   CRON_SECRET: z.string().optional(),
 
+  /** Deskzo CRM lead capture API. Leads are pushed only when both keys are set. */
+  DESKZO_API_URL: z.string().optional(),
+  DESKZO_KEY_ID: z.string().optional(),
+  DESKZO_SECRET: z.string().optional(),
+
   RUN_MIGRATIONS: bool(true),
   RUN_SEED: bool(false),
   SEED_ADMIN_EMAIL: z.string().optional(),

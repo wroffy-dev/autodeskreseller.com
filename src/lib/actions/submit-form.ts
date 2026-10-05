@@ -11,6 +11,7 @@ import {
   activeFields,
 } from '@/lib/validation/form-submission';
 import { notifyNewLead, logLeadActivity } from '@/lib/services/leads';
+import { initialCrmSyncFields, syncNewLead } from '@/lib/crm/deskzo.service';
 import { getEmailSettings, getWebsiteSettings } from '@/lib/services/settings';
 import { sendTemplate } from '@/lib/email/mailer';
 import { rateLimit } from '@/lib/utils/rate-limit';
@@ -321,6 +322,9 @@ export async function submitForm(payload: unknown): Promise<SubmitFormResult> {
         blogPostId: blogPost?.id ?? null,
         formId: form.id,
         leadMagnetId: envelope.leadMagnetId || null,
+        // Queued for the CRM in the same insert, so a lead can never exist
+        // here without the queue knowing it still has to be sent.
+        ...initialCrmSyncFields(),
       },
       include: { product: { select: { name: true } }, form: { select: { name: true } } },
       });
@@ -397,6 +401,9 @@ export async function submitForm(payload: unknown): Promise<SubmitFormResult> {
     // inside the transaction that decides whether the lead exists at all.
     void notifyNewLead({ lead: persisted, extraRecipients: splitEmails(formRecord?.notifyEmails) });
     void sendLeadConfirmation(persisted.email, persisted.name, persisted.product?.name ?? null);
+    // After the transaction, never inside it: the CRM being slow or down must
+    // not hold up — or undo — the lead itself. A miss is retried by the queue.
+    syncNewLead(persisted.id);
   }
   void leadId;
 

@@ -341,6 +341,7 @@ export const ADMIN_NAV: AdminNavModule[] = [
           '/admin/settings/email',
           '/admin/settings/design',
           '/admin/settings/countries',
+          '/admin/settings/crm',
         ],
       },
       {
@@ -354,6 +355,12 @@ export const ADMIN_NAV: AdminNavModule[] = [
         href: '/admin/settings/email',
         permission: 'settings.manage',
         description: 'SMTP and notification templates',
+      },
+      {
+        label: 'CRM Integration',
+        href: '/admin/settings/crm',
+        permission: 'settings.manage',
+        description: 'Send every lead to the Deskzo CRM',
       },
       {
         label: 'Staff',

@@ -10,6 +10,20 @@ This project uses [semantic versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
 ## [Unreleased]
 
+### Added
+
+- **Leads are sent to the Deskzo CRM.** Every lead captured on the site — and
+  every one staff add by hand — is pushed to Deskzo's lead capture API from the
+  server, with its company, designation, product, page and UTM tags. A lead the
+  CRM cannot take straight away is retried with backoff instead of lost, and
+  this site's lead id goes as `external_id`, so a retry never makes a second
+  CRM lead. Each lead shows its CRM status and reference, and
+  **Settings → CRM Integration** tests the key, shows the queue, retries
+  failures and can send the leads captured before. Configured with
+  `DESKZO_KEY_ID` and `DESKZO_SECRET`; retries run on
+  `POST /api/internal/cron/crm-sync`. See
+  [docs/CRM-INTEGRATION.md](./docs/CRM-INTEGRATION.md).
+
 ### Fixed
 
 - **Deleting a product from one market deleted it from every market.** The

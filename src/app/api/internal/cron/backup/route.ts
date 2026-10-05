@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto';
+import { cronSecret, matchesBearer } from '@/lib/api/cron-auth';
 import { json } from '@/lib/api/guard';
 import { createBackup } from '@/lib/backup/backup.service';
 import { sanitiseError } from '@/lib/backup/config';
@@ -19,10 +19,10 @@ export const maxDuration = 600;
  * actually due, and the global lock refuses a second concurrent run.
  */
 export async function POST(request: Request) {
-  const secret = process.env.CRON_SECRET;
+  const secret = cronSecret();
 
   // Without a configured secret the endpoint is not open — it is off.
-  if (!secret || secret.length < 16) {
+  if (!secret) {
     return json({ error: 'Scheduled backups are not configured.' }, 503);
   }
 
@@ -63,12 +63,4 @@ export async function POST(request: Request) {
     await refreshNextRun(new Date()).catch(() => undefined);
     return json({ ran: false, error: sanitiseError(error) }, 500);
   }
-}
-
-function matchesBearer(header: string | null, secret: string): boolean {
-  if (!header?.startsWith('Bearer ')) return false;
-  const provided = Buffer.from(header.slice(7));
-  const expected = Buffer.from(secret);
-  if (provided.length !== expected.length) return false;
-  return timingSafeEqual(provided, expected);
 }
