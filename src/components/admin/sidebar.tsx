@@ -671,8 +671,8 @@ function ExpandedModule({
                       : 'text-admin-nav/70 hover:text-admin-nav',
                   )}
                 >
-                  {/* Sits over the guide line beside the nested list. */}
-                  {active ? <ActiveBar className="-left-3" /> : null}
+                  {/* Beside the guide line, inside the list's clipped padding box. */}
+                  {active ? <ActiveBar className="-left-2.5" /> : null}
                   {item.label}
                 </Link>
               </li>

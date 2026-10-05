@@ -140,9 +140,7 @@ export function ThemeMenuItems({
           >
             <span className="flex items-center justify-between gap-2">
               {option.label}
-              {selected ? (
-                <Check className="h-4 w-4 text-[rgb(var(--accent))]" aria-hidden="true" />
-              ) : null}
+              {selected ? <Check className="h-4 w-4 text-brand" aria-hidden="true" /> : null}
             </span>
           </MenuItem>
         );
