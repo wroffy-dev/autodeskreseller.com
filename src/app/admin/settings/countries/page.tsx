@@ -121,7 +121,7 @@ export default async function CountriesAdmin({
   settingsValues.excludeFromSitemap = String(settings?.excludeFromSitemap ?? false);
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="max-w-5xl">
       <AdminPageHeader
         title="Countries"
         description="Each country is a storefront with its own URLs, pricing, content and contact details."

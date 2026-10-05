@@ -46,7 +46,7 @@ export default async function EmailSettingsPage() {
   }));
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="max-w-3xl">
       <AdminPageHeader
         title="Email"
         description="SMTP delivery, notification recipients and the transactional templates."

@@ -23,7 +23,7 @@ export default async function ProfilePage() {
   const data = await getMyProfile(user);
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="max-w-4xl">
       <AdminPageHeader
         title="My profile"
         description="Your details, password, two-step verification and signed-in devices."

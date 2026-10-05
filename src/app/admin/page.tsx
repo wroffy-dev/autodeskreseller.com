@@ -86,10 +86,22 @@ export default async function AdminDashboard({
 
   const [pagesCount, productsCount, customersCount, submissionsCount] = counts;
   const needsAttention = actionItems.filter((item) => item.tone === 'attention' && item.count > 0);
+
+  // The 30-day series drives the lead tile's sparkline, and its two halves the
+  // trend chip: the last 15 days against the 15 before them.
+  const daily = metrics.trend.map((point) => point.count);
+  const half = Math.floor(daily.length / 2);
+  const recent = daily.slice(half).reduce((sum, n) => sum + n, 0);
+  const earlier = daily.slice(0, half).reduce((sum, n) => sum + n, 0);
+  const leadTrend = earlier > 0 ? ((recent - earlier) / earlier) * 100 : null;
   const outstandingSetup = setupChecks.filter((check) => !check.configured);
 
   return (
-    <>
+    // `.dashboard` paints a fixed colour wash behind the page, which is what
+    // gives the glass panels something to blur. Every other screen stays on
+    // the plain workspace.
+    <div className="dashboard">
+      <div className="ambient" aria-hidden="true" />
       <AdminPageHeader
         title={`Welcome back, ${user.name.split(' ')[0]}`}
         description={
@@ -118,7 +130,7 @@ export default async function AdminDashboard({
       ) : null}
 
       {/* --- KPIs ------------------------------------------------------- */}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {canSeeLeads ? (
           <>
             <StatCard
@@ -127,6 +139,8 @@ export default async function AdminDashboard({
               hint={`${formatNumber(metrics.newThisMonth)} this month`}
               href="/admin/leads"
               icon="inbox"
+              trend={leadTrend}
+              sparkline={daily.length > 1 ? daily : undefined}
             />
             <StatCard
               label="New today"
@@ -192,7 +206,7 @@ export default async function AdminDashboard({
       {/* --- Needs attention + quick actions ---------------------------- */}
       <div className="mt-5 grid gap-5 lg:grid-cols-3">
         {actionItems.length > 0 ? (
-          <Card className="lg:col-span-2">
+          <Card glass className="lg:col-span-2">
             <CardHeader
               title="Needs attention"
               description={
@@ -208,15 +222,15 @@ export default async function AdminDashboard({
                     <Link
                       href={item.href}
                       className={cn(
-                        'flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors',
+                        'flex items-center gap-3 rounded-[var(--radius-card-sm)] border px-3 py-2.5 transition-colors',
                         item.tone === 'attention' && item.count > 0
                           ? 'border-amber-200 bg-amber-50/60 hover:border-amber-300'
-                          : 'border-hairline hover:border-brand/40 hover:bg-muted/[0.03]',
+                          : 'glass-chip border-hairline hover:border-brand/40',
                       )}
                     >
                       <span
                         className={cn(
-                          'font-heading text-lg font-bold tabular-nums',
+                          'text-lg font-semibold tabular-nums',
                           item.tone === 'attention' && item.count > 0
                             ? 'text-amber-700'
                             : 'text-content',
@@ -236,7 +250,7 @@ export default async function AdminDashboard({
           </Card>
         ) : null}
 
-        <Card className={cn(actionItems.length === 0 && 'lg:col-span-3')}>
+        <Card glass className={cn(actionItems.length === 0 && 'lg:col-span-3')}>
           <CardHeader title="Quick actions" />
           <CardBody className="pt-0">
             <QuickActions can={can} />
@@ -247,7 +261,7 @@ export default async function AdminDashboard({
       {/* --- Trend + pipeline ------------------------------------------- */}
       {canSeeLeads ? (
         <div className="mt-5 grid gap-5 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
+          <Card glass className="lg:col-span-2">
             <CardHeader
               title="Leads over the last 30 days"
               actions={
@@ -265,7 +279,7 @@ export default async function AdminDashboard({
             </CardBody>
           </Card>
 
-          <Card>
+          <Card glass>
             <CardHeader
               title="Pipeline"
               actions={
@@ -305,7 +319,7 @@ export default async function AdminDashboard({
       {/* --- Recent leads + activity + setup ---------------------------- */}
       <div className="mt-5 grid gap-5 lg:grid-cols-3">
         {canSeeLeads ? (
-          <Card className="lg:col-span-2">
+          <Card glass className="lg:col-span-2">
             <CardHeader
               title="Recent leads"
               actions={
@@ -329,7 +343,7 @@ export default async function AdminDashboard({
                   <li key={lead.id}>
                     <Link
                       href={`/admin/leads/${lead.id}`}
-                      className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/[0.03] sm:px-5"
+                      className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[rgb(var(--glass-tint)/0.5)] sm:px-5"
                     >
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-content">
@@ -358,7 +372,7 @@ export default async function AdminDashboard({
 
         <div className={cn('space-y-5', !canSeeLeads && 'lg:col-span-3')}>
           {setupChecks.length > 0 ? (
-            <Card>
+            <Card glass>
               <CardHeader
                 title="Setup"
                 description={
@@ -412,7 +426,7 @@ export default async function AdminDashboard({
           ) : null}
 
           {recentActivity.length > 0 ? (
-            <Card>
+            <Card glass>
               <CardHeader
                 title="Recent activity"
                 actions={
@@ -447,6 +461,6 @@ export default async function AdminDashboard({
           ) : null}
         </div>
       </div>
-    </>
+    </div>
   );
 }

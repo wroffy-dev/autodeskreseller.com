@@ -64,7 +64,7 @@ export default async function EditStaff({ params }: { params: Promise<{ id: stri
   };
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="max-w-3xl">
       <AdminPageHeader
         title={member.name}
         description={`${member.email} · added ${formatDate(member.createdAt)}`}

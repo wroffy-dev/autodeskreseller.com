@@ -40,6 +40,12 @@ export type AdminNavModule = {
   id: string;
   label: string;
   icon: string;
+  /**
+   * The sidebar heading this module sits under ("Website", "Growth"). Adjacent
+   * modules sharing a section are listed together under one heading; a module
+   * with none (Dashboard) sits above every heading.
+   */
+  section?: string;
   /** A group with an href and no items is a single destination (Dashboard). */
   href?: string;
   exact?: boolean;
@@ -109,6 +115,7 @@ export const ADMIN_NAV: AdminNavModule[] = [
   },
   {
     id: 'products',
+    section: 'Catalogue',
     label: 'Products',
     icon: 'package',
     items: [
@@ -159,6 +166,7 @@ export const ADMIN_NAV: AdminNavModule[] = [
   },
   {
     id: 'crm',
+    section: 'Customers',
     label: 'Leads & CRM',
     icon: 'inbox',
     items: [
@@ -209,6 +217,7 @@ export const ADMIN_NAV: AdminNavModule[] = [
   },
   {
     id: 'content',
+    section: 'Content',
     label: 'Content & SEO',
     icon: 'file',
     items: [
@@ -265,6 +274,7 @@ export const ADMIN_NAV: AdminNavModule[] = [
   },
   {
     id: 'marketing',
+    section: 'Growth',
     label: 'Marketing',
     icon: 'megaphone',
     items: [
@@ -297,6 +307,7 @@ export const ADMIN_NAV: AdminNavModule[] = [
   },
   {
     id: 'reports',
+    section: 'Growth',
     label: 'Reports',
     icon: 'chart',
     items: [
@@ -317,6 +328,7 @@ export const ADMIN_NAV: AdminNavModule[] = [
   },
   {
     id: 'settings',
+    section: 'Admin',
     label: 'Settings',
     icon: 'settings',
     items: [

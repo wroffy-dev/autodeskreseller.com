@@ -40,7 +40,7 @@ export default async function PageCategories() {
   }));
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="max-w-4xl">
       <AdminPageHeader
         title="Page categories"
         description="Group pages into a nested structure, e.g. Solutions → Cloud Solutions. Deleting a category never deletes its pages."

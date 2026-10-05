@@ -17,7 +17,7 @@ export default async function NewCustomer() {
   });
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="max-w-3xl">
       <AdminPageHeader
         title="New customer"
         description="For accounts that did not come through the website pipeline."

@@ -219,16 +219,14 @@ export function AdminSearch({
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
         className={cn(
-          // The trigger lives in the dark top bar; the palette it opens stays a
-          // light reading surface.
-          'admin-focus admin-focus-header flex h-9 w-full items-center gap-2 rounded-lg px-3',
-          'border border-admin-nav/[0.12] bg-admin-nav/[0.08] text-sm text-admin-nav/60',
-          'transition-colors hover:border-admin-nav/25 hover:bg-admin-nav/[0.12] hover:text-admin-nav/80',
+          'admin-focus flex h-9 w-full items-center gap-2 rounded-[var(--radius-control)] px-3',
+          'border border-admin-nav/[0.08] bg-admin-nav/[0.04] text-sm text-admin-nav/55',
+          'transition-colors hover:border-admin-nav/15 hover:bg-admin-nav/[0.06] hover:text-admin-nav/75',
         )}
       >
         <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span className="min-w-0 flex-1 truncate text-left">Search or jump to…</span>
-        <kbd className="hidden shrink-0 rounded border border-admin-nav/15 bg-admin-nav/10 px-1.5 py-0.5 font-mono text-[0.625rem] text-admin-nav/70 sm:block">
+        <kbd className="hidden shrink-0 rounded-md border border-admin-nav/10 bg-[rgb(var(--surface))] px-1.5 py-0.5 font-mono text-[0.625rem] text-admin-nav/60 shadow-sm sm:block">
           ⌘K
         </kbd>
       </button>
@@ -241,13 +239,13 @@ export function AdminSearch({
           aria-label="Command palette"
         >
           <div
-            className="absolute inset-0 bg-[rgb(var(--admin-header-bg))]/50 backdrop-blur-[2px]"
+            className="admin-scrim absolute inset-0"
             onClick={() => setOpen(false)}
             aria-hidden="true"
           />
 
           <div
-            className="relative flex max-h-[70dvh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-hairline bg-surface shadow-2xl"
+            className="relative flex max-h-[70dvh] w-full max-w-xl flex-col overflow-hidden rounded-[var(--radius-dialog)] border border-hairline bg-surface shadow-[var(--shadow-lg)]"
             onKeyDown={onKeyDown}
           >
             <div className="flex shrink-0 items-center gap-3 border-b border-hairline px-4">

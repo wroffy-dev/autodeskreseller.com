@@ -25,7 +25,7 @@ export default async function SettingsAdmin() {
   ) as Record<string, string | boolean>;
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="max-w-3xl">
       <AdminPageHeader
         title="Website settings"
         description="Name, contact details, logos and the site header. The footer is on Website design."

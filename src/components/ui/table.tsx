@@ -82,7 +82,7 @@ export function Th({
     <th
       scope="col"
       className={cn(
-        'border-b border-hairline bg-muted/[0.04] px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted',
+        'border-b border-hairline bg-muted/[0.04] px-3 py-2.5 text-[0.6875rem] font-semibold uppercase tracking-wider text-muted',
         align === 'right' && 'text-right',
         align === 'center' && 'text-center',
         align === 'left' && 'text-left',
@@ -112,5 +112,5 @@ export function Td({
 }
 
 export function Tr({ className, ...props }: React.HTMLAttributes<HTMLTableRowElement>) {
-  return <tr className={cn('transition-colors hover:bg-muted/[0.03]', className)} {...props} />;
+  return <tr className={cn('transition-colors hover:bg-muted/[0.04]', className)} {...props} />;
 }

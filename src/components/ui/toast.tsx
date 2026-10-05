@@ -69,7 +69,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               key={t.id}
               role={t.tone === 'error' ? 'alert' : 'status'}
               className={cn(
-                'pointer-events-auto flex animate-slide-up items-start gap-2.5 rounded-lg border px-3.5 py-3 shadow-lg',
+                'ui-toast pointer-events-auto flex animate-slide-up items-start gap-2.5 rounded-lg border px-3.5 py-3 shadow-lg',
                 STYLES[t.tone],
               )}
             >

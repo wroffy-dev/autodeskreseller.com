@@ -4,6 +4,10 @@ import { getCurrentUser, requireUser } from '@/lib/auth/guards';
 import { getWebsiteSettings } from '@/lib/services/settings';
 import { getAdminCountryScope } from '@/lib/country/admin';
 import { AdminShell } from '@/components/admin/admin-shell';
+import { ADMIN_THEME_SCRIPT } from '@/lib/admin/theme';
+// Every rule in here is scoped under `.admin-ui`, so it cannot reach the public site.
+import './admin-ui.css';
+import './admin-dark.generated.css';
 
 /**
  * Titles for the admin — but only for somebody who is actually in it.
@@ -38,7 +42,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const user = await requireUser();
   const [site, role, account, scope] = await Promise.all([
     getWebsiteSettings(),
-    user.role ? prisma.userRole.findUnique({ where: { slug: user.role }, select: { name: true } }) : null,
+    user.role
+      ? prisma.userRole.findUnique({ where: { slug: user.role }, select: { name: true } })
+      : null,
     prisma.user.findUnique({ where: { id: user.id }, select: { image: true } }),
     // Resolved here so the selector renders from a server value and there is
     // nothing for hydration to correct.
@@ -46,31 +52,35 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   ]);
 
   return (
-    <AdminShell
-      user={{
-        name: user.name,
-        email: user.email,
-        roleName: role?.name ?? 'Staff',
-        permissions: user.permissions,
-        isSuperAdmin: user.role === 'super-admin',
-        image: account?.image ?? null,
-      }}
-      branding={{
-        siteName: site.siteName,
-        logoUrl: site.logoUrl,
-        // The admin rail is dark, so it prefers the dark-surface logo when one
-        // has been uploaded — the same choice the public footer makes.
-        logoDarkUrl: site.logoDarkUrl,
-      }}
-      country={{ id: scope.country.id, code: scope.country.code, name: scope.country.name }}
-      countries={scope.countries.map((country) => ({
-        id: country.id,
-        code: country.code,
-        name: country.name,
-        isDefault: country.isDefault,
-      }))}
-    >
-      {children}
-    </AdminShell>
+    <>
+      {/* Applies the stored Light / Dark / System choice before the shell
+          paints, so a dark admin never flashes light on reload. */}
+      <script dangerouslySetInnerHTML={{ __html: ADMIN_THEME_SCRIPT }} />
+      <AdminShell
+        user={{
+          name: user.name,
+          email: user.email,
+          roleName: role?.name ?? 'Staff',
+          permissions: user.permissions,
+          isSuperAdmin: user.role === 'super-admin',
+          image: account?.image ?? null,
+        }}
+        branding={{
+          siteName: site.siteName,
+          logoUrl: site.logoUrl,
+          // Shown instead of the regular logo while the admin is in dark mode.
+          logoDarkUrl: site.logoDarkUrl,
+        }}
+        country={{ id: scope.country.id, code: scope.country.code, name: scope.country.name }}
+        countries={scope.countries.map((country) => ({
+          id: country.id,
+          code: country.code,
+          name: country.name,
+          isDefault: country.isDefault,
+        }))}
+      >
+        {children}
+      </AdminShell>
+    </>
   );
 }

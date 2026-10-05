@@ -74,7 +74,7 @@ export default async function SeoAdmin() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="max-w-3xl">
       <AdminPageHeader
         title="SEO"
         description="Global defaults. Individual pages, products and posts override these."

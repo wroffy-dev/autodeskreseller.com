@@ -39,28 +39,32 @@ export function AdminPageHeader({
       {backHref ? (
         <Link
           href={backHref}
-          className="mb-2 inline-flex items-center gap-1.5 text-xs font-medium text-muted transition-colors hover:text-brand"
+          className="mb-3 inline-flex items-center gap-1.5 rounded-md text-xs font-medium text-muted transition-colors hover:text-content"
         >
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
           {backLabel}
         </Link>
       ) : null}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-        <div className="min-w-0">
+      {/* The title keeps a readable width; when the actions do not fit beside
+          it they wrap underneath instead of squeezing it. */}
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div className="min-w-0 flex-[1_1_20rem]">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <h1 className="font-heading text-xl font-bold tracking-tight text-content sm:text-[1.625rem]">
+            <h1 className="font-heading text-2xl font-bold tracking-tight text-content sm:text-[1.875rem] sm:leading-tight">
               {title}
             </h1>
             {status ? <div className="flex flex-wrap items-center gap-1.5">{status}</div> : null}
           </div>
           {description ? (
-            <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted">{description}</p>
+            <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted sm:text-[0.9375rem]">
+              {description}
+            </p>
           ) : null}
         </div>
 
         {actions ? (
-          <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">{actions}</div>
+          <div className="flex max-w-full flex-wrap items-center gap-2">{actions}</div>
         ) : null}
       </div>
     </div>

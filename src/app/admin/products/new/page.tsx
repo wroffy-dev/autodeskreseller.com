@@ -25,7 +25,7 @@ export default async function NewProduct() {
   ]);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="max-w-3xl">
       <AdminPageHeader
         title="New product"
         description="Add the plan, its pricing and the form its button should open."

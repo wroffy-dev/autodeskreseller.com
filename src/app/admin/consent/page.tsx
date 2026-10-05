@@ -36,7 +36,7 @@ export default async function ConsentAdmin() {
   }));
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="max-w-3xl">
       <AdminPageHeader
         title="Consent notice"
         description="The wording shown beside every public form, and the record kept of what each person agreed to."

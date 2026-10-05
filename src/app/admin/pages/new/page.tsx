@@ -16,7 +16,7 @@ export default async function NewPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="max-w-3xl">
       <AdminPageHeader
         title="New page"
         description="Create the page, then add and arrange its sections."

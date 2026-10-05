@@ -46,7 +46,7 @@ export default async function LeadMagnetsAdmin() {
   }));
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="max-w-5xl">
       <AdminPageHeader
         title="Lead magnets"
         description="Downloads and offers exchanged for contact details. Place one with the Lead magnet block."

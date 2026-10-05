@@ -116,7 +116,8 @@ export function PreviewFrame({
           src={src}
           title={title}
           className={cn(
-            'h-full w-full border-0 bg-white',
+            // The public site inside the frame: never recoloured by dark mode.
+            'ui-keep-white h-full w-full border-0 bg-white',
             compact ? 'min-h-[26rem]' : 'min-h-[70vh]',
             active.width && 'rounded-xl border border-hairline shadow-xl',
           )}
