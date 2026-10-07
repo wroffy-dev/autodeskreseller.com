@@ -1,5 +1,5 @@
 import type { BlogListItem, BlogPostDetail, BlogCategoryItem, BlogTagItem } from '@/lib/services/blog';
-import { countryPath } from '@/lib/country/routing';
+import { blogArchiveHref, blogCategoryHref, blogTagHref, postHref } from '@/lib/urls/links';
 import type { CountryContext } from '@/lib/country/types';
 import type { ResolvedBlogSettings, BlogCardSettings } from './blog-settings';
 import type { TocItem } from './blog-toc';
@@ -89,16 +89,17 @@ export function resolveCard(
 }
 
 /**
- * Where the blog's URLs live, per market.
+ * Where the blog's URLs live.
  *
- * Kept in one place so links never drift, and market-aware so the same blog
- * block renders `/blog/x` on the root market and `/ae/blog/x` on the UAE one
- * without knowing which market it is in.
+ * The blog is root-only, so every market links to the one root address of an
+ * article, category or tag — never to a prefixed copy that would only
+ * redirect. The address comes from the URL registry by the content's id, so a
+ * blog moved to `/insights` or an article given a custom URL is linked
+ * correctly everywhere at once.
  */
-export const blogPath = (country: CountryContext) => countryPath(country, 'blog');
-export const categoryPath = (country: CountryContext, slug: string) =>
-  countryPath(country, `blog/category/${slug}`);
-export const tagPath = (country: CountryContext, slug: string) =>
-  countryPath(country, `blog/tag/${slug}`);
-export const postPath = (country: CountryContext, slug: string) =>
-  countryPath(country, `blog/${slug}`);
+type BlogRef = { id: string; slug: string };
+
+export const blogPath = () => blogArchiveHref();
+export const categoryPath = (category: BlogRef) => blogCategoryHref(category);
+export const tagPath = (tag: BlogRef) => blogTagHref(tag);
+export const postPath = (post: BlogRef) => postHref(post);

@@ -6,6 +6,10 @@ import { publishedPostWhere } from '@/lib/services/blog';
 import { listActiveCountries } from './registry';
 import { countryPath, contentSlug } from './routing';
 import type { CountryContext } from './types';
+import { getUrlSnapshot } from '@/lib/urls/load';
+import { pathKey } from '@/lib/urls/path';
+import { ROOT_ONLY_TYPES } from '@/lib/urls/types';
+import { pageAlternates, productAlternates } from '@/lib/urls/alternates';
 
 /**
  * Where the market switcher should send a visitor.
@@ -118,6 +122,46 @@ async function countriesWithHome(): Promise<Set<string>> {
   return new Set(rows.map((row) => row.countryId));
 }
 
+/**
+ * The same content in every market, through the URL registry.
+ *
+ * Found by identity — the same product, the same page group — so a market
+ * whose address for it differs is still offered, at its own address. Blog
+ * content is root-only, so every market's option is the one root address.
+ * Returns null when the registry is off or does not know the address, and the
+ * rules below apply instead.
+ */
+async function registryEquivalents(
+  current: CountryContext,
+  path: string,
+): Promise<{ shared: string | null; byCountry: Map<string, string> } | null> {
+  const snapshot = await getUrlSnapshot();
+  if (!snapshot.enabled) return null;
+  const key = pathKey(countryPath(current, path));
+  const route = key ? snapshot.byKey.get(key) : undefined;
+  if (!route) return null;
+
+  if (ROOT_ONLY_TYPES.has(route.type)) return { shared: route.path, byCountry: new Map() };
+
+  const alternates =
+    route.type === 'PRODUCT'
+      ? await (async () => {
+          const product = await prisma.product.findUnique({
+            where: { id: route.entityId },
+            select: { id: true, slug: true },
+          });
+          return product ? productAlternates(product) : [];
+        })()
+      : await (async () => {
+          const page = await prisma.page.findUnique({
+            where: { id: route.entityId },
+            select: { id: true, slug: true, groupKey: true },
+          });
+          return page ? pageAlternates(page, { indexableOnly: false }) : [];
+        })();
+  return { shared: null, byCountry: new Map(alternates.map((entry) => [entry.countryId, entry.path])) };
+}
+
 export const resolveMarketOptions = cache(
   async (current: CountryContext, path: string): Promise<MarketOption[]> => {
     const [countries, surface] = await Promise.all([
@@ -126,10 +170,35 @@ export const resolveMarketOptions = cache(
     ]);
 
     if (countries.length < 2) return [];
-    const [equivalents, withHome] = await Promise.all([
-      countriesWithEquivalent(surface),
+    const [registry, withHome] = await Promise.all([
+      registryEquivalents(current, path),
       countriesWithHome(),
     ]);
+
+    if (registry) {
+      const reachable = countries.filter(
+        (country) =>
+          country.id === current.id ||
+          withHome.has(country.id) ||
+          registry.byCountry.has(country.id) ||
+          registry.shared !== null,
+      );
+      if (reachable.length < 2) return [];
+      return reachable.map((country) => {
+        const equivalent = registry.shared ?? registry.byCountry.get(country.id) ?? null;
+        return {
+          code: country.code,
+          name: country.name,
+          slug: country.slug,
+          locale: country.locale,
+          href: equivalent ?? countryPath(country),
+          isCurrent: country.id === current.id,
+          isEquivalent: equivalent !== null,
+        };
+      });
+    }
+
+    const equivalents = await countriesWithEquivalent(surface);
 
     /*
      * A market is offered only when the visitor has somewhere to land: this

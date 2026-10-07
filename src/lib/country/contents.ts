@@ -21,6 +21,8 @@ export type CountryContents = {
    * saying out loud before anyone presses the button.
    */
   forms: number;
+  /** The market's cities. Their pages are counted with the pages. */
+  cities?: number;
 };
 
 /** True when removing the market would destroy something. */
@@ -32,7 +34,8 @@ export function hasContents(contents: CountryContents): boolean {
       contents.leads +
       contents.pricing +
       contents.popups +
-      contents.forms >
+      contents.forms +
+      (contents.cities ?? 0) >
     0
   );
 }
@@ -49,6 +52,7 @@ export function describeContents(contents: CountryContents): string {
   };
 
   add(contents.pages, 'page', 'pages');
+  add(contents.cities ?? 0, 'city', 'cities');
   add(contents.posts, 'article', 'articles');
   add(contents.menus, 'menu', 'menus');
   add(contents.leads, 'lead', 'leads');

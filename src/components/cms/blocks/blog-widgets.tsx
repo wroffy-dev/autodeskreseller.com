@@ -146,7 +146,7 @@ export async function WidgetSearch({ content, ctx, id }: WidgetProps<WidgetSearc
   return (
     <WidgetShell chrome={chromeOf(content)} headingId={id}>
       <BlogSearch
-        action={blogPath(ctx.country)}
+        action={blogPath()}
         placeholder={content.placeholder}
         buttonLabel={content.buttonLabel}
         showButton={content.showButton}
@@ -220,7 +220,7 @@ function WidgetPostRow({
   country: CountryContext;
 }) {
   const image = post.thumbnail ?? post.featuredImage;
-  const href = postPath(country, post.slug);
+  const href = postPath(post);
   const withImage = content.showImage && content.layout !== 'list' && Boolean(image);
 
   const meta: string[] = [];
@@ -303,7 +303,7 @@ export async function WidgetCategories({ content, ctx, id }: WidgetProps<WidgetC
           {categories.map((category) => (
             <li key={category.id}>
               <Link
-                href={categoryPath(ctx.country, category.slug)}
+                href={categoryPath(category)}
                 className={cn('blog-chip blog-chip--pill', activeSlug === category.slug && 'blog-chip--active')}
               >
                 {category.name}
@@ -317,7 +317,7 @@ export async function WidgetCategories({ content, ctx, id }: WidgetProps<WidgetC
           {categories.map((category) => (
             <li key={category.id} className={category.parentId ? 'pl-4' : undefined}>
               <Link
-                href={categoryPath(ctx.country, category.slug)}
+                href={categoryPath(category)}
                 aria-current={activeSlug === category.slug ? 'page' : undefined}
                 className="blog-widget__link flex items-center justify-between gap-2"
               >
@@ -344,7 +344,7 @@ export async function WidgetTags({ content, ctx, id }: WidgetProps<WidgetTagsCon
       <ul className="flex flex-wrap gap-1.5">
         {shown.map((tag) => (
           <li key={tag.id}>
-            <Link href={tagPath(ctx.country, tag.slug)} className="blog-card__tag">
+            <Link href={tagPath(tag)} className="blog-card__tag">
               {tag.name}
               {content.showCounts ? <span className="ml-1 opacity-60">{tag.count}</span> : null}
             </Link>

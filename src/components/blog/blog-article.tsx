@@ -3,9 +3,9 @@ import { getWebsiteSettings } from '@/lib/services/settings';
 import type { BlogPostDetail } from '@/lib/services/blog';
 import { buildTableOfContents } from '@/lib/cms/blog-toc';
 import { parsePostOptions, resolveToggle, POST_TOGGLES } from '@/lib/cms/blog-settings';
-import type { BlogRenderContext } from '@/lib/cms/blog-render';
+import { postPath, type BlogRenderContext } from '@/lib/cms/blog-render';
 import { sanitizeHtml } from '@/lib/utils/sanitize';
-import { absoluteCountryUrl } from '@/lib/seo/metadata';
+import { absoluteUrl } from '@/lib/seo/metadata';
 import { localiseHtml } from '@/lib/country/routing';
 import type { CountryContext } from '@/lib/country/types';
 import { SectionList, type RenderableSection } from '@/components/cms/section-renderer';
@@ -78,7 +78,8 @@ export async function BlogArticle({
       post,
       html,
       toc: items,
-      shareUrl: absoluteCountryUrl(country, `blog/${post.slug}`),
+      // The article's one address, from the URL registry — root-only.
+      shareUrl: absoluteUrl(postPath(post)),
       visible,
       forms: {
         cta: options.ctaFormSlug,

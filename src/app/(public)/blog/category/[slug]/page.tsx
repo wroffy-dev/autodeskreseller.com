@@ -1,43 +1,32 @@
 import type { Metadata } from 'next';
-import { getDefaultCountry } from '@/lib/country/registry';
 import {
-  blogCategoryMetadata,
-  BlogCategorySurface,
-  type BlogSearchParams,
-} from '../../../_surfaces/blog';
+  PublicRoute,
+  pathFromSegments,
+  publicRouteMetadata,
+  type RouteSearchParams,
+} from '../../../_surfaces/public-route';
 
+// The root layout reads the visitor's tracking-consent cookie, so nothing under
+// it can be rendered statically. Declaring `revalidate` here made Next try
+// anyway and every request failed with DYNAMIC_SERVER_USAGE.
 export const dynamic = 'force-dynamic';
 
 type Params = Promise<{ slug: string }>;
-type SearchParams = Promise<BlogSearchParams>;
+type Search = Promise<RouteSearchParams>;
 
-/** The root market's category archive. Prefixed markets share the same surface. */
+/** `/blog/category/<slug>`, resolved through the URL registry. */
 export async function generateMetadata({
   params,
   searchParams,
 }: {
   params: Params;
-  searchParams: SearchParams;
+  searchParams: Search;
 }): Promise<Metadata> {
-  const [{ slug }, query, country] = await Promise.all([
-    params,
-    searchParams,
-    getDefaultCountry(),
-  ]);
-  return blogCategoryMetadata(country, slug, query);
+  const [{ slug }, query] = await Promise.all([params, searchParams]);
+  return publicRouteMetadata(pathFromSegments(['blog', 'category', slug]), query);
 }
 
-export default async function CategoryArchive({
-  params,
-  searchParams,
-}: {
-  params: Params;
-  searchParams: SearchParams;
-}) {
-  const [{ slug }, query, country] = await Promise.all([
-    params,
-    searchParams,
-    getDefaultCountry(),
-  ]);
-  return <BlogCategorySurface country={country} slug={slug} searchParams={query} />;
+export default async function BlogCategoryPage({ params, searchParams }: { params: Params; searchParams: Search }) {
+  const [{ slug }, query] = await Promise.all([params, searchParams]);
+  return <PublicRoute path={pathFromSegments(['blog', 'category', slug])} query={query} />;
 }

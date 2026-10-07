@@ -35,7 +35,7 @@ export function CategoryChips({
   if (categories.length === 0 && !showAll) return null;
 
   // "All" returns to the market's own archive, never the root market's.
-  const allHref = basePath ?? blogPath(country);
+  const allHref = basePath ?? blogPath();
 
   const chipClass = (active: boolean) =>
     cn(
@@ -61,7 +61,7 @@ export function CategoryChips({
           return (
             <li key={category.id}>
               <Link
-                href={categoryPath(country, category.slug)}
+                href={categoryPath(category)}
                 className={chipClass(active)}
                 aria-current={active ? 'page' : undefined}
               >

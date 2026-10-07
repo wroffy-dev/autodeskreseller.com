@@ -119,7 +119,8 @@ const publishedState = (sourceStatus, sourcePublishedAt) =>
 
 async function clonePages(from, to) {
   const pages = await prisma.page.findMany({
-    where: { countryId: from.id, deletedAt: null },
+    // City pages belong to their city, and a city to one market: not cloned.
+    where: { countryId: from.id, deletedAt: null, cityId: null },
     include: { sections: { orderBy: { sortOrder: 'asc' } } },
     orderBy: { createdAt: 'asc' },
   });
@@ -546,6 +547,13 @@ async function main() {
   if (rate !== null) console.log(`  • check every price: they are ${from.currency} × ${rate}, not a quote`);
   else if (productCount > 0) console.log(`  • set prices for ${productCount} product listings, then publish them`);
   console.log('  • read the copied pages: text written for one market rarely fits another');
+  console.log('');
+  // The copy is written straight to the database, so the URL registry has not
+  // seen it yet. While the registry answers public requests, content without a
+  // registered address is not served — a scan registers it, changing nothing else.
+  console.log('Then register the new addresses: Admin → SEO → Slug & URL Manager → Scan again');
+  console.log('(or `npm run urls:backfill`). Until then, with the registry switched on, the copied');
+  console.log('pages and products are not reachable.');
   console.log('');
 }
 

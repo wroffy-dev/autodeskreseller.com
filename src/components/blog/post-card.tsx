@@ -34,7 +34,7 @@ export function PostCard({
 }) {
   const ratio = RATIO_CSS[card.imageRatio];
   const image = post.featuredImage ?? post.thumbnail;
-  const href = postPath(country, post.slug);
+  const href = postPath(post);
 
   return (
     <article
@@ -90,7 +90,7 @@ export function PostCard({
           <ul className="mt-3 flex flex-wrap gap-1.5">
             {post.tags.slice(0, 4).map(({ tag }) => (
               <li key={tag.slug}>
-                <Link href={tagPath(country, tag.slug)} className="blog-card__tag">
+                <Link href={tagPath(tag)} className="blog-card__tag">
                   {tag.name}
                 </Link>
               </li>
@@ -135,7 +135,7 @@ function CardMeta({
   return (
     <div className="blog-card__meta flex flex-wrap items-center gap-x-2 gap-y-1">
       {card.showCategory && post.category ? (
-        <Link href={categoryPath(country, post.category.slug)} className="blog-card__category">
+        <Link href={categoryPath(post.category)} className="blog-card__category">
           {post.category.name}
         </Link>
       ) : null}

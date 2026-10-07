@@ -34,9 +34,9 @@ const listSelect = {
   isFeatured: true,
   featuredImage: { select: { url: true, altText: true, width: true, height: true } },
   thumbnail: { select: { url: true, altText: true, width: true, height: true } },
-  category: { select: { name: true, slug: true } },
+  category: { select: { id: true, name: true, slug: true } },
   author: { select: { name: true, image: true, jobTitle: true } },
-  tags: { select: { tag: { select: { name: true, slug: true } } } },
+  tags: { select: { tag: { select: { id: true, name: true, slug: true } } } },
 } satisfies Prisma.BlogPostSelect;
 
 export type BlogListItem = Prisma.BlogPostGetPayload<{ select: typeof listSelect }>;
@@ -97,6 +97,22 @@ export const getCategoryBySlug = cache(async (slug: string, countryId?: string) 
 export const getTagBySlug = cache(async (slug: string) =>
   prisma.blogTag.findUnique({ where: { slug } }),
 );
+
+/** The same category, by the stable id the URL registry resolves to. */
+export const getCategoryById = cache(async (id: string, countryId?: string) =>
+  prisma.blogCategory.findUnique({
+    where: { id },
+    include: {
+      bannerImage: { select: { url: true, altText: true, width: true, height: true } },
+      image: { select: { url: true, altText: true, width: true, height: true } },
+      ogImage: { select: { url: true } },
+      parent: { select: { id: true, name: true, slug: true } },
+      countries: countryId ? { where: { countryId }, take: 1 } : false,
+    },
+  }),
+);
+
+export const getTagById = cache(async (id: string) => prisma.blogTag.findUnique({ where: { id } }));
 
 // ---------------------------------------------------------------------------
 // Listing
@@ -268,7 +284,9 @@ const postInclude = {
   thumbnail: true,
   ogImage: { select: { url: true } },
   twitterImage: { select: { url: true } },
-  category: { select: { id: true, name: true, slug: true, parent: { select: { name: true, slug: true } } } },
+  category: {
+    select: { id: true, name: true, slug: true, parent: { select: { id: true, name: true, slug: true } } },
+  },
   author: {
     select: {
       id: true,
@@ -290,6 +308,16 @@ export const getPublishedPost = cache(
   async (countryId: string, slug: string): Promise<BlogPostDetail | null> => {
     return prisma.blogPost.findFirst({
       where: { ...publishedPostWhere(countryId), slug },
+      include: postInclude,
+    });
+  },
+);
+
+/** A published article by the stable id the URL registry resolves to. */
+export const getPublishedPostById = cache(
+  async (countryId: string, id: string): Promise<BlogPostDetail | null> => {
+    return prisma.blogPost.findFirst({
+      where: { ...publishedPostWhere(countryId), id },
       include: postInclude,
     });
   },

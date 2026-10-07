@@ -152,7 +152,7 @@ export function compileRobots(input: RobotsInput): { body: string; warnings: Rob
     if (country.noIndexCountry) {
       warnings.push({
         level: 'warning',
-        message: `${country.name} is set to noindex. That is served as a meta tag and header on its pages — it is deliberately not a Disallow rule here, because a blocked page is never fetched and its noindex is never read.`,
+        message: `${country.name} is set to noindex. That is served as a robots meta tag on its pages — it is deliberately not a Disallow rule here, because a blocked page is never fetched and its noindex is never read.`,
       });
     }
   }

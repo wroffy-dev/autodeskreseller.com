@@ -3,6 +3,7 @@ import type { WebsiteSettings } from '@prisma/client';
 import { countryPath } from '@/lib/country/routing';
 import type { CountryContext, CountrySettingsView } from '@/lib/country/types';
 import { absoluteUrl, absoluteCountryUrl } from './metadata';
+import { blogArchiveHref } from '@/lib/urls/links';
 
 type Json = Record<string, unknown>;
 
@@ -90,7 +91,8 @@ export function organizationSchema(
 }
 
 export function websiteSchema(country: CountryContext, site: WebsiteSettings): Json {
-  const blog = absoluteCountryUrl(country, 'blog');
+  // The blog is root-only: its search lives at the one archive address.
+  const blog = absoluteUrl(blogArchiveHref());
   return {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
@@ -103,16 +105,6 @@ export function websiteSchema(country: CountryContext, site: WebsiteSettings): J
       'query-input': 'required name=search_term_string',
     },
   };
-}
-
-/** A market-relative breadcrumb trail. Paths are prefixed for the market. */
-export function countryBreadcrumbSchema(
-  country: CountryContext,
-  items: Array<{ name: string; path: string }>,
-): Json {
-  return breadcrumbSchema(
-    items.map((item) => ({ name: item.name, path: countryPath(country, item.path) })),
-  );
 }
 
 export function breadcrumbSchema(items: Array<{ name: string; path: string }>): Json {
