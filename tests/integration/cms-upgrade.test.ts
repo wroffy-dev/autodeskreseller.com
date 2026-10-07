@@ -11,6 +11,7 @@ const { createProduct, reorderProducts, toggleProductFeatured, saveBrand, delete
 );
 const { parseSectionDesign } = await import('@/lib/cms/design');
 const { selectProducts } = await import('@/lib/services/products');
+const { purgeFromTrash } = await import('@/lib/actions/trash');
 const { getPublicForm } = await import('@/lib/services/forms');
 const { EMPTY_FORM, starterFields } = await import('@/lib/cms/form-model');
 
@@ -376,18 +377,33 @@ describe('product ordering and featured products', () => {
     expect(result.map((p) => p.id)).toEqual(picked);
   });
 
-  it('keeps products when their brand is deleted', async () => {
+  it('keeps products when their brand is deleted, and stops showing the brand', async () => {
     const throwaway = await saveBrand(null, formData({ name: `Temp ${suffix}`, slug: '', sortOrder: '0' }));
     const tempId = (throwaway as { data: { id: string } }).data.id;
+    brandIds.push(tempId);
+    const productId = productIds[0]!;
 
-    await prisma.product.update({ where: { id: productIds[0]! }, data: { brandId: tempId } });
+    await prisma.product.update({ where: { id: productId }, data: { brandId: tempId } });
     const result = await deleteBrand(tempId);
     expect(result.ok).toBe(true);
 
-    const product = await prisma.product.findUniqueOrThrow({ where: { id: productIds[0]! } });
+    // The brand goes to the recycle bin, and the product stays — still
+    // pointing at it, so restoring the brand reconnects the product.
+    const product = await prisma.product.findUniqueOrThrow({ where: { id: productId } });
     expect(product.deletedAt).toBeNull();
-    expect(product.brandId).toBeNull();
+    expect(product.brandId).toBe(tempId);
+    expect((await prisma.brand.findUniqueOrThrow({ where: { id: tempId } })).deletedAt).not.toBeNull();
 
-    await prisma.product.update({ where: { id: productIds[0]! }, data: { brandId } });
+    // Visitors no longer see a brand that has been deleted.
+    const [shown] = await selectProducts(testCountryContext(), { source: 'selected', productIds: [productId], limit: 1 });
+    expect(shown?.id).toBe(productId);
+    expect(shown?.brandName).toBeNull();
+    expect(shown?.brandId).toBeNull();
+
+    // Deleted for good, the product simply loses it.
+    expect((await purgeFromTrash('brand', tempId)).ok).toBe(true);
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: productId } })).brandId).toBeNull();
+
+    await prisma.product.update({ where: { id: productId }, data: { brandId } });
   });
 });

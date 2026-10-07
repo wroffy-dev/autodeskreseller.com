@@ -194,6 +194,27 @@ Only one backup or restore runs at a time, enforced by a lock row guarded by a
 transaction-scoped advisory lock. The claim carries a six-hour expiry so a
 killed container cannot wedge the system permanently.
 
+### URL registry, cities and SEO Intelligence (1.2.0)
+
+Their data is ordinary tables in the same database — `UrlRoute`,
+`UrlPattern`, `UrlHistory`, `UrlNotFound`, `UrlOperation`, `UrlSettings`,
+`City`, `CityPageBatch`, `CityProduct`, `SeoAudit`, plus columns on `Page`,
+`Redirect` and the keyword columns — so every database backup contains it and
+a restore brings it back consistent with the content restored alongside it.
+The CHECK constraints and triggers that guard city address spaces and city
+status are part of the schema the dump recreates; `pg_dump` places triggers
+after the table data, so they never fire against half-restored rows.
+
+- **Restoring a backup taken before 1.2.0** onto 1.2.0: the restore puts the
+  old schema back, so run `prisma migrate deploy` (it runs on start) and then
+  a URL scan (Slug & URL Manager → *Run first scan*, or `npm run urls:backfill`)
+  — the same as a first rollout. Cities start empty; SEO scores recalculate
+  from the dashboard.
+- **Restoring a 1.2.0 backup**: nothing else is needed. Each server reloads
+  the URL registry on its next request, and SEO scores whose content changed
+  show as outdated until recalculated.
+- `SeoAudit` is a cache: if it is ever lost, *Recalculate all* rebuilds it.
+
 ---
 
 ## Importing an archive

@@ -12,6 +12,9 @@ import { MediaPicker } from '@/components/admin/media-picker';
 import { GalleryPicker } from '@/components/admin/gallery-picker';
 import { RichTextEditor } from '@/components/cms/rich-text-editor';
 import { StringListEditor, SpecListEditor, type SpecItem } from '@/components/admin/list-editor';
+import { PrimaryKeywordsFields } from '@/components/admin/seo/primary-keywords-fields';
+import { SeoScorePanel } from '@/components/admin/seo/seo-score-panel';
+import { jumpResolver } from '@/components/admin/seo/jump';
 import { FormSelect } from '@/components/cms/form-select';
 import { useToast } from '@/components/ui/toast';
 import { Spinner } from '@/components/ui/icons';
@@ -57,6 +60,9 @@ export type ProductFormValues = {
   seoDescription: string;
   canonicalUrl: string;
   noIndex: boolean;
+  primaryKeyword1: string;
+  primaryKeyword2: string;
+  primaryKeyword3: string;
 };
 
 export const EMPTY_PRODUCT: ProductFormValues = {
@@ -96,6 +102,9 @@ export const EMPTY_PRODUCT: ProductFormValues = {
   seoDescription: '',
   canonicalUrl: '',
   noIndex: false,
+  primaryKeyword1: '',
+  primaryKeyword2: '',
+  primaryKeyword3: '',
 };
 
 const TABS = [
@@ -108,18 +117,42 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]['id'];
 
+/** Where each field an SEO check can point at lives on this form. */
+const SEO_FIELDS: Partial<Record<string, { tab: TabId; id: string }>> = {
+  name: { tab: 'details', id: 'name' },
+  slug: { tab: 'details', id: 'slug' },
+  status: { tab: 'details', id: 'status' },
+  content: { tab: 'details', id: 'product-description' },
+  specs: { tab: 'content', id: 'product-specs' },
+  seoTitle: { tab: 'seo', id: 'seoTitle' },
+  seoDescription: { tab: 'seo', id: 'seoDescription' },
+  canonicalUrl: { tab: 'seo', id: 'canonicalUrl' },
+  noIndex: { tab: 'seo', id: 'noIndex' },
+  primaryKeyword1: { tab: 'seo', id: 'primaryKeyword1' },
+  ogImage: { tab: 'seo', id: 'product-og-image' },
+};
+
 export function ProductForm({
   initial,
   categories,
   brands,
   formIdBySlug,
   mode,
+  seoMarket = null,
+  urlHint = '/products/…',
 }: {
   initial: ProductFormValues;
   categories: Array<{ id: string; name: string }>;
   brands: Array<{ id: string; name: string }>;
   formIdBySlug: Record<string, string>;
   mode: 'create' | 'edit';
+  /**
+   * The market this form saves prices and status into, which is the product
+   * page the SEO score describes. Null before the product exists.
+   */
+  seoMarket?: { id: string; name: string } | null;
+  /** Where products live, from the URL pattern the site serves now. */
+  urlHint?: string;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -131,6 +164,67 @@ export function ProductForm({
 
   const set = <K extends keyof ProductFormValues>(key: K, value: ProductFormValues[K]) =>
     setValues((current) => ({ ...current, [key]: value }));
+
+  const productId = initial.id;
+  const resolveJump = React.useMemo(
+    () =>
+      jumpResolver<TabId>({
+        fields: SEO_FIELDS,
+        areas: {
+          general: { tab: 'details', label: 'Go to details' },
+          content: { tab: 'details', id: 'product-description', label: 'Go to description' },
+          media: { tab: 'details', id: 'product-image', label: 'Go to images' },
+          pricing: { tab: 'pricing', label: 'Go to pricing' },
+          seo: { tab: 'seo', label: 'Go to SEO settings' },
+          ...(productId
+            ? {
+                sections: {
+                  label: 'Open page layout',
+                  run: () => {
+                    window.open(`/admin/products/${productId}/layout`, '_blank', 'noopener');
+                  },
+                },
+              }
+            : {}),
+        },
+        openTab: setTab,
+      }),
+    [productId],
+  );
+
+  // What the score panel scores: the form as it stands, saved or not.
+  const seoDraft = {
+    name: values.name,
+    slug: values.slug,
+    sku: values.sku,
+    status: values.status,
+    shortDescription: values.shortDescription,
+    description: values.description,
+    storage: values.storage,
+    minUsers: values.minUsers,
+    maxUsers: values.maxUsers,
+    features: values.features,
+    benefits: values.benefits,
+    specs: values.specs,
+    imageId: values.imageId,
+    galleryIds: values.galleryIds,
+    categoryId: values.categoryId,
+    brandId: values.brandId,
+    currency: values.currency,
+    monthlyPrice: values.monthlyPrice,
+    annualPrice: values.annualPrice,
+    priceSuffix: values.priceSuffix,
+    priceNote: values.priceNote,
+    ctaLabel: values.ctaLabel,
+    seoTitle: values.seoTitle,
+    seoDescription: values.seoDescription,
+    canonicalUrl: values.canonicalUrl,
+    noIndex: values.noIndex,
+    ogImageId: values.ogImageId,
+    primaryKeyword1: values.primaryKeyword1,
+    primaryKeyword2: values.primaryKeyword2,
+    primaryKeyword3: values.primaryKeyword3,
+  };
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -166,6 +260,9 @@ export function ProductForm({
       'seoTitle',
       'seoDescription',
       'canonicalUrl',
+      'primaryKeyword1',
+      'primaryKeyword2',
+      'primaryKeyword3',
     ];
     for (const key of simple) data.set(key, String(values[key] ?? ''));
     data.set('isFeatured', String(values.isFeatured));
@@ -230,7 +327,7 @@ export function ProductForm({
               </Field>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="URL" htmlFor="slug" error={errors.slug} hint="/products/…">
+                <Field label="URL" htmlFor="slug" error={errors.slug} hint={urlHint}>
                   <Input
                     id="slug"
                     value={values.slug}
@@ -260,7 +357,7 @@ export function ProductForm({
                 />
               </Field>
 
-              <Field label="Full description" hint="Shown on the product page.">
+              <Field id="product-description" label="Full description" hint="Shown on the product page.">
                 <RichTextEditor
                   value={values.description}
                   onChange={(v) => set('description', v)}
@@ -354,6 +451,7 @@ export function ProductForm({
               </div>
 
               <Field
+                id="product-image"
                 label="Product image"
                 hint="Shown on cards and at the top of the product page."
               >
@@ -538,11 +636,13 @@ export function ProductForm({
                 onChange={(next) => set('benefits', next)}
                 placeholder="Replace ageing file servers without retraining"
               />
-              <SpecListEditor
-                label="Specifications"
-                value={values.specs}
-                onChange={(next) => set('specs', next)}
-              />
+              <div id="product-specs">
+                <SpecListEditor
+                  label="Specifications"
+                  value={values.specs}
+                  onChange={(next) => set('specs', next)}
+                />
+              </div>
             </>
           </TabPanel>
 
@@ -588,6 +688,17 @@ export function ProductForm({
 
           <TabPanel id="seo" active={tab} className="space-y-4">
             <>
+              <SeoScorePanel
+                entity={
+                  productId && seoMarket
+                    ? { type: 'PRODUCT_MARKET', id: productId, countryId: seoMarket.id }
+                    : null
+                }
+                marketName={seoMarket?.name}
+                payload={{ productDraft: seoDraft }}
+                resolveJump={resolveJump}
+                emptyMessage="Save this product to see its SEO, AEO and GEO scores. From then on they update as you edit."
+              />
               <Field
                 label="SEO title"
                 htmlFor="seoTitle"
@@ -613,6 +724,12 @@ export function ProductForm({
                   onChange={(e) => set('seoDescription', e.target.value)}
                 />
               </Field>
+              <PrimaryKeywordsFields
+                values={values}
+                onChange={(field, value) => set(field, value)}
+                errors={errors}
+                description="The searches this product is written to answer, in every market that does not set its own under Country pricing. SEO Intelligence checks for them in the title, description, URL, headings and copy. They are analysis inputs only: nothing is added to the page’s markup."
+              />
               <Field label="Canonical URL" htmlFor="canonicalUrl">
                 <Input
                   id="canonicalUrl"
@@ -620,7 +737,7 @@ export function ProductForm({
                   onChange={(e) => set('canonicalUrl', e.target.value)}
                 />
               </Field>
-              <Field label="Social share image" hint="Recommended 1200×630.">
+              <Field id="product-og-image" label="Social share image" hint="Recommended 1200×630.">
                 <MediaPicker
                   value={values.ogImageId}
                   onChange={(id) => set('ogImageId', id)}
@@ -629,6 +746,7 @@ export function ProductForm({
               </Field>
               <div className="rounded-lg border border-hairline p-4">
                 <Switch
+                  id="noIndex"
                   checked={values.noIndex}
                   onChange={(next) => set('noIndex', next)}
                   label="Hide from search engines (noindex)"
@@ -671,6 +789,18 @@ function tabForField(field: string): TabId {
   }
   if (['features', 'benefits', 'specs'].includes(field)) return 'content';
   if (['ctaLabel', 'ctaUrl', 'ctaFormId'].includes(field)) return 'cta';
-  if (['seoTitle', 'seoDescription', 'canonicalUrl', 'noIndex'].includes(field)) return 'seo';
+  if (
+    [
+      'seoTitle',
+      'seoDescription',
+      'canonicalUrl',
+      'noIndex',
+      'primaryKeyword1',
+      'primaryKeyword2',
+      'primaryKeyword3',
+    ].includes(field)
+  ) {
+    return 'seo';
+  }
   return 'details';
 }

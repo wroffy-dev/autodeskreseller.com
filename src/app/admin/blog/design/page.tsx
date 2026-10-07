@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { blogPath } from '@/lib/cms/blog-render';
+import { getUrlSnapshot } from '@/lib/urls/load';
 import Link from 'next/link';
 import { Eye, Layers } from 'lucide-react';
 import { requireAnyPermission, userCanAny } from '@/lib/auth/guards';
@@ -20,6 +22,8 @@ export const dynamic = 'force-dynamic';
  */
 export default async function BlogDesignAdmin() {
   const user = await requireAnyPermission(['blog.design', 'blog.edit']);
+  // The blog's address comes from the URL registry.
+  await getUrlSnapshot();
 
   const [settings, row] = await Promise.all([
     getBlogSettings(),
@@ -42,7 +46,7 @@ export default async function BlogDesignAdmin() {
               Blog layout
             </Link>
             <Link
-              href="/blog"
+              href={blogPath()}
               target="_blank"
               rel="noopener noreferrer"
               className={buttonClasses('outline', 'md')}

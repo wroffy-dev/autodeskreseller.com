@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { ExternalLink, Eye } from 'lucide-react';
+import { ExternalLink, Eye, MapPin } from 'lucide-react';
 import { prisma } from '@/lib/db/prisma';
 import { listPageCategoryOptions } from '@/lib/services/page-categories';
 import { requirePermission, userCan } from '@/lib/auth/guards';
@@ -17,6 +17,7 @@ import type { FieldValues } from '@/components/cms/field-renderer';
 import { getCountryById, getDefaultCountry, listActiveCountries } from '@/lib/country/registry';
 import { countryPath } from '@/lib/country/routing';
 import { parseBlockContent } from '@/lib/cms/blocks';
+import { formatDate } from '@/lib/utils/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,7 +47,12 @@ export default async function EditPage({ params }: { params: Promise<{ id: strin
 
   const page = await prisma.page.findFirst({
     where: { id, deletedAt: null },
-    include: { sections: { orderBy: { sortOrder: 'asc' } } },
+    include: {
+      sections: { orderBy: { sortOrder: 'asc' } },
+      city: { select: { id: true, name: true, isActive: true } },
+      generatedFrom: { select: { id: true, title: true, deletedAt: true } },
+      generationBatch: { select: { sourceTitle: true } },
+    },
   });
   if (!page) notFound();
 
@@ -80,6 +86,9 @@ export default async function EditPage({ params }: { params: Promise<{ id: strin
     twitterTitle: page.twitterTitle ?? '',
     twitterDescription: page.twitterDescription ?? '',
     twitterImageId: page.twitterImageId,
+    primaryKeyword1: page.primaryKeyword1 ?? '',
+    primaryKeyword2: page.primaryKeyword2 ?? '',
+    primaryKeyword3: page.primaryKeyword3 ?? '',
   };
 
   const sections: BuilderSection[] = page.sections.map((section) => ({
@@ -152,6 +161,45 @@ export default async function EditPage({ params }: { params: Promise<{ id: strin
           </>
         }
       />
+
+      {page.city || page.generatedAt ? (
+        <div className="mb-5 space-y-1.5 rounded-lg border border-hairline bg-muted/[0.04] px-3 py-2.5 text-sm text-muted">
+          {page.city ? (
+            <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+              <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span>
+                {page.isCityHomepage ? 'The landing page of ' : 'A page in '}
+                <span className="font-medium text-content">{page.city.name}</span>.
+              </span>
+              <Link href={`/admin/cities/${page.city.id}`} className="font-medium text-brand hover:underline">
+                Manage the city
+              </Link>
+              {!page.city.isActive ? (
+                <span className="text-amber-700">
+                  The city is switched off, so this page answers 404 until it is switched back on.
+                </span>
+              ) : null}
+            </p>
+          ) : null}
+          {page.generatedAt ? (
+            <p>
+              Generated from{' '}
+              {page.generatedFrom && !page.generatedFrom.deletedAt ? (
+                <Link href={`/admin/pages/${page.generatedFrom.id}`} className="font-medium text-brand hover:underline">
+                  “{page.generatedFrom.title}”
+                </Link>
+              ) : (
+                <span className="font-medium text-content">
+                  “{page.generatedFrom?.title ?? page.generationBatch?.sourceTitle ?? 'a page that no longer exists'}”
+                </span>
+              )}{' '}
+              on {formatDate(page.generatedAt)}
+              {page.city ? ` for ${page.city.name}` : ''}. It is an independent page: changes to the source never
+              reach it, and changes here reach nothing else.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <PageEditorTabs
         sectionCount={sections.length}

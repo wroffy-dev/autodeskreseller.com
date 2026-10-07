@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { pageSlug, slugify } from '@/lib/utils/slug';
+import { primaryKeywordShape, rejectDuplicateKeywords } from '@/lib/seo/keywords';
 
 export const contentStatusSchema = z.enum(['DRAFT', 'PUBLISHED', 'SCHEDULED', 'ARCHIVED']);
 
@@ -48,11 +49,14 @@ export const pageInputSchema = z
     twitterTitle: optionalString(200),
     twitterDescription: optionalString(400),
     twitterImageId: optionalString(40),
+
+    ...primaryKeywordShape,
   })
   .refine((data) => data.status !== 'SCHEDULED' || data.publishedAt !== null, {
     message: 'A scheduled page needs a publish date',
     path: ['publishedAt'],
-  });
+  })
+  .superRefine(rejectDuplicateKeywords);
 
 export type PageInput = z.infer<typeof pageInputSchema>;
 

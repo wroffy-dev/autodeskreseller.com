@@ -558,6 +558,9 @@ function CountrySettingsForm({
   const { toast } = useToast();
   const [values, setValues] = React.useState(initial);
   const [pending, setPending] = React.useState(false);
+  const [errors, setErrors] = React.useState<Record<string, string[]>>({});
+  // Each field's label, so a failed save can say which fields to fix.
+  const labels = React.useRef<Record<string, string>>({});
 
   const set = (key: string, value: string) =>
     setValues((current) => ({ ...current, [key]: value }));
@@ -565,43 +568,70 @@ function CountrySettingsForm({
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
+    setErrors({});
     const data = new FormData();
     for (const [key, value] of Object.entries(values)) data.set(key, value);
     const result = await saveCountrySettings(country.id, data);
     setPending(false);
     if (!result.ok) {
-      toast(result.error, 'error');
+      /*
+       * The whole form is one save, crawler switches included, so a field that
+       * fails validation keeps every other change from being stored. Say which
+       * one, beside it and in the toast, and take the editor to it — a vague
+       * "correct the highlighted fields" with nothing highlighted is how a
+       * switch appeared to turn itself back on.
+       */
+      const fieldErrors = result.fieldErrors ?? {};
+      setErrors(fieldErrors);
+      const keys = Object.keys(fieldErrors);
+      if (keys.length > 0) {
+        const names = keys.map((key) => labels.current[key] ?? key);
+        toast(`Not saved. Check ${names.join(', ')}.`, 'error');
+        const first = document.getElementById(`cs-${keys[0]}`);
+        first?.scrollIntoView({ block: 'center' });
+        first?.focus({ preventScroll: true });
+      } else {
+        toast(result.error, 'error');
+      }
       return;
     }
     toast(result.message ?? 'Saved.');
     router.refresh();
   }
 
-  const text = (key: string, label: string, hint?: string, placeholder?: string) => (
-    <Field label={label} htmlFor={`cs-${key}`} hint={hint}>
-      <Input
-        id={`cs-${key}`}
-        value={values[key] ?? ''}
-        placeholder={placeholder}
-        disabled={!canEdit}
-        onChange={(e) => set(key, e.target.value)}
-      />
-    </Field>
-  );
+  const text = (key: string, label: string, hint?: string, placeholder?: string) => {
+    labels.current[key] = label;
+    return (
+      <Field label={label} htmlFor={`cs-${key}`} hint={hint} error={errors[key]}>
+        <Input
+          id={`cs-${key}`}
+          value={values[key] ?? ''}
+          placeholder={placeholder}
+          disabled={!canEdit}
+          aria-invalid={errors[key] ? true : undefined}
+          onChange={(e) => set(key, e.target.value)}
+        />
+      </Field>
+    );
+  };
 
   /** A multi-line field, for the one-path-per-line crawler rules. */
-  const area = (key: string, label: string, hint?: string) => (
-    <Field label={label} htmlFor={`cs-${key}`} hint={hint}>
-      <Textarea
-        id={`cs-${key}`}
-        rows={4}
-        value={values[key] ?? ''}
-        placeholder={'/thanks\n/internal-preview'}
-        disabled={!canEdit}
-        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => set(key, e.target.value)}
-      />
-    </Field>
-  );
+  const area = (key: string, label: string, hint?: string) => {
+    labels.current[key] = label;
+    return (
+      <Field label={label} htmlFor={`cs-${key}`} hint={hint} error={errors[key]}>
+        <Textarea
+          id={`cs-${key}`}
+          rows={4}
+          value={values[key] ?? ''}
+          placeholder={'/thanks\n/internal-preview'}
+          disabled={!canEdit}
+          aria-invalid={errors[key] ? true : undefined}
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => set(key, e.target.value)}
+        />
+      </Field>
+    );
+  };
 
   return (
     <form onSubmit={onSubmit} className="mt-6">
@@ -705,14 +735,14 @@ function CountrySettingsForm({
                 checked={values.noIndexCountry === 'true'}
                 onChange={(next) => set('noIndexCountry', String(next))}
                 label="Ask search engines not to index this market"
-                hint="Sent as a meta tag and an X-Robots-Tag header on every page. Deliberately not a Disallow rule, for the reason above."
+                hint="Adds a robots noindex meta tag to every page of this market, and only this market. Deliberately not a Disallow rule, for the reason above."
                 disabled={!canEdit}
               />
               <Switch
                 checked={values.excludeFromSitemap === 'true'}
                 onChange={(next) => set('excludeFromSitemap', String(next))}
                 label="Leave this market out of the sitemaps"
-                hint="The pages still serve; they are simply not listed."
+                hint="The pages still serve; they are simply not listed. A market asked not to be indexed is never listed either."
                 disabled={!canEdit}
               />
             </div>

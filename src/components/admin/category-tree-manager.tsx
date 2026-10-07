@@ -14,6 +14,7 @@ import { Spinner } from '@/components/ui/icons';
 import { slugify } from '@/lib/utils/slug';
 import { flattenTree, descendantIds } from '@/lib/utils/tree';
 import { cn } from '@/lib/utils/cn';
+import { fillPattern } from '@/lib/urls/path';
 
 export type CategoryRow = {
   id: string;
@@ -88,6 +89,7 @@ export function CategoryTreeManager({
   canEdit,
   canDelete,
   urlPrefix,
+  urlPattern,
   itemLabel,
   withSeo = false,
   extraFields = [],
@@ -102,6 +104,8 @@ export function CategoryTreeManager({
   canDelete: boolean;
   /** Shown beside each row, e.g. "/blog/category/". */
   urlPrefix: string;
+  /** Where rows live when that is a URL pattern, e.g. "/insights/{slug}"; wins over the prefix. */
+  urlPattern?: string;
   /** What the count counts: "post" or "page". */
   itemLabel: string;
   withSeo?: boolean;
@@ -284,8 +288,7 @@ export function CategoryTreeManager({
                   </Td>
                   <Td>
                     <code className="rounded bg-muted/10 px-1.5 py-0.5 font-mono text-xs text-muted">
-                      {urlPrefix}
-                      {row.slug}
+                      {urlPattern ? fillPattern(urlPattern, row.slug) : `${urlPrefix}${row.slug}`}
                     </code>
                   </Td>
                   <Td align="center" className="text-sm text-muted">
@@ -387,7 +390,7 @@ export function CategoryTreeManager({
               />
             </Field>
 
-            <Field label="URL slug" htmlFor="cat-slug" error={errors.slug} hint={urlPrefix}>
+            <Field label="URL slug" htmlFor="cat-slug" error={errors.slug} hint={urlPattern ? urlPattern.replace('{slug}', '…') : urlPrefix}>
               <Input
                 id="cat-slug"
                 value={editing.slug}

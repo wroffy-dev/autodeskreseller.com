@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { slugify } from '@/lib/utils/slug';
+import { primaryKeywordShape, rejectDuplicateKeywords } from '@/lib/seo/keywords';
 
 const optional = (max: number) =>
   z
@@ -87,6 +88,8 @@ export const productInputSchema = z
     canonicalUrl: optional(500),
     noIndex: z.coerce.boolean().default(false),
     ogImageId: optional(40),
+
+    ...primaryKeywordShape,
   })
   .refine(
     (data) => data.minUsers === null || data.maxUsers === null || data.maxUsers >= data.minUsers,
@@ -95,7 +98,8 @@ export const productInputSchema = z
   .refine((data) => data.status !== 'SCHEDULED' || data.publishedAt !== null, {
     message: 'A scheduled product needs a publish date',
     path: ['publishedAt'],
-  });
+  })
+  .superRefine(rejectDuplicateKeywords);
 
 export type ProductInput = z.infer<typeof productInputSchema>;
 

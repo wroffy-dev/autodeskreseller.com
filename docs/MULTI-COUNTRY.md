@@ -37,6 +37,7 @@ that proves it.
 - [Rehearsing the migration](#rehearsing-the-migration)
 - [How to add a country](#how-to-add-a-country)
 - [Opening a market from an existing one](#opening-a-market-from-an-existing-one)
+- [Cities](#cities)
 
 ---
 
@@ -828,3 +829,13 @@ home page to switch on to.
 Afterwards the run prints what still needs a human: the contact details, the
 prices, and the copy itself — text written for one market rarely fits another.
 
+---
+
+## Cities
+
+A market can have cities: local address spaces inside it, such as `/delhi`
+in the root market and `/ae/dubai` in the UAE. The market stays the market —
+currency, pricing, settings — and a city's pages are ordinary pages of that
+market. A city belongs to exactly one market; syncing or cloning a market
+leaves city pages out, and deleting a market deletes its cities with its
+pages. Full reference: [CITIES.md](CITIES.md).

@@ -39,9 +39,12 @@ export type TrashedProduct = {
 export function ProductTrashTable({
   products,
   canManage,
+  urlPattern = '/products/{slug}',
 }: {
   products: TrashedProduct[];
   canManage: boolean;
+  /** Where a restored product would live, from the URL pattern the site serves now. */
+  urlPattern?: string;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -94,7 +97,7 @@ export function ProductTrashTable({
                   ) : null}
                 </Td>
                 <Td>
-                  <code className="text-xs text-muted">/products/{product.slug}</code>
+                  <code className="text-xs text-muted">{urlPattern.replace('{slug}', product.slug)}</code>
                 </Td>
                 <Td>
                   <span className="text-sm text-muted">

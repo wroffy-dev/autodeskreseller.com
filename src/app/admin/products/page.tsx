@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { getUrlSnapshot } from '@/lib/urls/load';
+import { productHref } from '@/lib/urls/links';
 import Link from 'next/link';
 import { Plus, Tag, ArrowUpDown, Building2, Trash2 } from 'lucide-react';
 import { prisma } from '@/lib/db/prisma';
@@ -136,6 +138,8 @@ export default async function ProductsAdmin({
     delete: userCan(user, 'products.delete'),
   };
 
+  // "View" opens the product where the URL registry has it in this market.
+  await getUrlSnapshot();
   const tableRows: ProductRow[] = rows.map((row) => {
     // This market's configuration. Present by construction — the query only
     // returns products this market offers — but read defensively so a race
@@ -146,6 +150,7 @@ export default async function ProductsAdmin({
       id: row.id,
       name: row.name,
       slug: row.slug,
+      publicPath: productHref(scope.country, row),
       sku: row.sku,
       status: here?.status ?? row.status,
       isFeatured: here?.isFeatured ?? row.isFeatured,

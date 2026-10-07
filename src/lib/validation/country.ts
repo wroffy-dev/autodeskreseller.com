@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { isReservedCountryPrefix } from '@/lib/country/routing';
+import { primaryKeywordShape, rejectDuplicateKeywords } from '@/lib/seo/keywords';
 
 /**
  * Country validation.
@@ -14,10 +15,26 @@ import { isReservedCountryPrefix } from '@/lib/country/routing';
 const optional = (max: number) =>
   z
     .string()
-    .max(max)
+    .max(max, `Use ${max} characters or fewer.`)
     .optional()
     .nullable()
     .transform((value) => (value?.trim() ? value.trim() : null));
+
+/**
+ * A switch as a form submits it.
+ *
+ * These schemas read `Object.fromEntries(formData)`, so a switch arrives as
+ * the string "true" or "false". `z.coerce.boolean()` turns any non-empty
+ * string into true — "false" included — which switched a market to noindex
+ * every time its settings were saved. Only an explicit yes counts as yes;
+ * a missing value keeps the default.
+ */
+const formBoolean = (fallback: boolean) =>
+  z.preprocess((value) => {
+    if (value === undefined || value === null) return fallback;
+    if (typeof value === 'boolean') return value;
+    return ['true', 'on', '1'].includes(String(value).trim().toLowerCase());
+  }, z.boolean());
 
 export const countrySlugSchema = z
   .string()
@@ -67,6 +84,14 @@ export const countrySchema = z.object({
 
 export type CountryInput = z.infer<typeof countrySchema>;
 
+/*
+ * Every limit here is at least the limit of the global setting the same value
+ * can come from. The multi-country migration and the seed copy the site's
+ * email, default title and the rest into the root market's row, and a market
+ * row holding a value this schema refuses can never be saved again — not even
+ * to switch its crawler settings off, which is how "Ask search engines not to
+ * index this market" came to spring back on after every save.
+ */
 export const countrySettingsSchema = z.object({
   // --- crawler rules --------------------------------------------------------
   // Free text, one path per line. The compiler in lib/seo/robots.ts is what
@@ -74,15 +99,16 @@ export const countrySettingsSchema = z.object({
   // two places to keep in agreement.
   robotsDisallow: optional(2000),
   robotsAllow: optional(2000),
-  noIndexCountry: z.coerce.boolean().default(false),
-  excludeFromSitemap: z.coerce.boolean().default(false),
+  noIndexCountry: formBoolean(false),
+  excludeFromSitemap: formBoolean(false),
   companyName: optional(160),
   legalName: optional(160),
   salesPhone: optional(40),
   supportPhone: optional(40),
   whatsappNumber: optional(40),
-  salesEmail: optional(160),
-  supportEmail: optional(160),
+  // WebsiteSettings.contactEmail allows 200.
+  salesEmail: optional(200),
+  supportEmail: optional(200),
   addressLine1: optional(200),
   addressLine2: optional(200),
   city: optional(120),
@@ -95,7 +121,8 @@ export const countrySettingsSchema = z.object({
   headerCtaLabel: optional(60),
   headerCtaUrl: optional(300),
   salesCtaText: optional(200),
-  defaultTitle: optional(200),
+  // SeoSettings.defaultTitle allows 240.
+  defaultTitle: optional(240),
   titleTemplate: optional(120),
   defaultDescription: optional(400),
   defaultOgImageUrl: optional(500),
@@ -132,7 +159,7 @@ export const productCountrySchema = z.object({
     .nullable()
     .transform((value) => (value ? new Date(value) : null))
     .refine((date) => date === null || !Number.isNaN(date.getTime()), 'Enter a valid date'),
-  isFeatured: z.coerce.boolean().default(false),
+  isFeatured: formBoolean(false),
   sortOrder: z.coerce.number().int().min(0).max(9999).default(0),
   featuredOrder: z.coerce.number().int().min(0).max(9999).default(0),
   currency: z
@@ -161,8 +188,10 @@ export const productCountrySchema = z.object({
   seoTitle: optional(200),
   seoDescription: optional(400),
   canonicalUrl: optional(500),
-  noIndex: z.coerce.boolean().default(false),
+  noIndex: formBoolean(false),
   ogImageId: optional(40),
-});
+  /** This market's own keywords; all blank uses the product's. */
+  ...primaryKeywordShape,
+}).superRefine(rejectDuplicateKeywords);
 
 export type ProductCountryInput = z.infer<typeof productCountrySchema>;

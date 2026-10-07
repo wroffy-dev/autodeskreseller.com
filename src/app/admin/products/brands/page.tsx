@@ -8,7 +8,6 @@ import { BrandManager, type BrandRow } from '@/components/admin/products/brand-m
 import { Card } from '@/components/ui/card';
 import { buttonClasses } from '@/components/ui/button';
 import { taxonomyPageMap } from '@/lib/services/taxonomy-pages';
-import { taxonomyPageSlug } from '@/lib/cms/taxonomy-pages';
 
 export const metadata: Metadata = { title: 'Brands' };
 export const dynamic = 'force-dynamic';
@@ -29,11 +28,7 @@ export default async function BrandsAdmin() {
 
   // Which of them already have their page in this market. See the categories
   // screen — same reasoning, same shape.
-  const pages = await taxonomyPageMap(
-    'brand',
-    brands.map((brand) => brand.slug),
-    scope.country.id,
-  );
+  const pages = await taxonomyPageMap('brand', brands, scope.country.id);
 
   const rows: BrandRow[] = brands.map((brand) => ({
     id: brand.id,
@@ -45,7 +40,7 @@ export default async function BrandsAdmin() {
     logoId: brand.logoId,
     logoUrl: brand.logo?.url ?? null,
     productCount: brand._count.products,
-    pageId: pages.get(taxonomyPageSlug('brand', brand.slug)) ?? null,
+    pageId: pages.get(brand.id) ?? null,
   }));
 
   return (

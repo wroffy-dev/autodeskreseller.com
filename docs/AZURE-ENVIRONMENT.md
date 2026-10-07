@@ -160,7 +160,7 @@ MFA_ENCRYPTION_KEY=                # SECRET → mfa-encryption-key
 | `DATABASE_URL` | ✅ | Must include `sslmode=require` on Azure. Add `connection_limit=5` so replicas do not exhaust the server's connections. |
 | `AUTH_SECRET` | ✅ | 16 characters minimum, 32+ recommended. Changing it signs everyone out; nothing else breaks. |
 | `NEXTAUTH_URL` | ✅ | Must be `https://` in production and must not end in `/`. Wrong value breaks sign-in redirects. |
-| `NEXT_PUBLIC_SITE_URL` | ✅ | Used for canonical URLs, the sitemap and social previews. Normally identical to `NEXTAUTH_URL`. |
+| `NEXT_PUBLIC_SITE_URL` | ✅ | Used for canonical URLs, the sitemap and social previews. Normally identical to `NEXTAUTH_URL`. Also the canonical host: requests on its bare-domain or `www` twin are redirected to it (308). |
 | `ENCRYPTION_KEY` | ✅ | 32 characters minimum. Encrypts secrets saved through the admin, such as an SMTP password. |
 
 ### Runtime
@@ -171,6 +171,7 @@ MFA_ENCRYPTION_KEY=                # SECRET → mfa-encryption-key
 | `RUN_MIGRATIONS` | `true` | Runs `prisma migrate deploy` at startup. Only ever applies existing migrations. |
 | `RUN_SEED` | `false` | `true` for one deployment to create the first admin, then back to `false`. |
 | `MIGRATION_MAX_ATTEMPTS` | `7` | Retry budget for a database that is still waking up. Raise it if your server is slow to start. |
+| `CANONICAL_HOST_REDIRECT` | `true` | `false` when Front Door or another proxy already redirects the bare domain to `www` (or the reverse). See [URL-REGISTRY.md](./URL-REGISTRY.md#redirects). |
 | `SKIP_ENV_VALIDATION` | unset | Escape hatch for the Docker build only. Never set it on a running deployment — it disables the startup check that catches misconfiguration. |
 
 ### First admin

@@ -11,6 +11,9 @@ import { AdminPageHeader } from '@/components/admin/page-header';
 import { ProductLayoutBuilder } from '@/components/admin/products/product-layout-builder';
 import type { BuilderSection } from '@/components/cms/section-builder';
 import { buttonClasses } from '@/components/ui/button';
+import { productHref } from '@/lib/urls/links';
+import { getUrlSnapshot } from '@/lib/urls/load';
+import { getAdminCountryScope } from '@/lib/country/admin';
 
 export const metadata: Metadata = { title: 'Product layout' };
 export const dynamic = 'force-dynamic';
@@ -37,10 +40,14 @@ export default async function ProductLayoutAdmin({
   });
   if (!product) notFound();
 
-  const [detail, sidebar] = await Promise.all([
+  const [detail, sidebar, scope] = await Promise.all([
     getProductSectionRows(product.id, 'DETAIL'),
     getProductSectionRows(product.id, 'SIDEBAR'),
+    getAdminCountryScope(),
+    getUrlSnapshot(),
   ]);
+  // "View product" opens it where the URL registry has it in this market.
+  const root = scope.country;
 
   const toBuilder = (rows: typeof detail): BuilderSection[] =>
     rows.map((row) => ({
@@ -82,7 +89,7 @@ export default async function ProductLayoutAdmin({
               Product design
             </Link>
             <Link
-              href={`/products/${product.slug}`}
+              href={productHref(root, product)}
               target="_blank"
               rel="noopener noreferrer"
               className={buttonClasses('outline', 'md')}

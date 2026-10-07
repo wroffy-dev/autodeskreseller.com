@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { slugify } from '@/lib/utils/slug';
 import { blogPostOptionsSchema } from '@/lib/cms/blog-settings';
+import { primaryKeywordShape, rejectDuplicateKeywords } from '@/lib/seo/keywords';
 
 const optional = (max: number) =>
   z
@@ -52,11 +53,15 @@ export const blogPostSchema = z
     ogDescription: optional(400),
     ogImageId: optional(40),
     twitterImageId: optional(40),
+
+    /** The first replaces `focusKeyword`, which the action keeps equal to it. */
+    ...primaryKeywordShape,
   })
   .refine((data) => data.status !== 'SCHEDULED' || data.publishedAt !== null, {
     message: 'A scheduled post needs a publish date',
     path: ['publishedAt'],
-  });
+  })
+  .superRefine(rejectDuplicateKeywords);
 
 export const blogCategorySchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(120),
@@ -86,7 +91,8 @@ export const blogCategorySchema = z.object({
   ogImageId: optional(40),
   noIndex: z.coerce.boolean().default(false),
   noFollow: z.coerce.boolean().default(false),
-});
+  ...primaryKeywordShape,
+}).superRefine(rejectDuplicateKeywords);
 
 /** A blog tag. Slug uniqueness is enforced in the action. */
 export const blogTagSchema = z.object({

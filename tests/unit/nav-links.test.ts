@@ -25,8 +25,8 @@ const item = (over: Partial<LinkableItem>): LinkableItem => ({
   ...over,
 });
 
-const live = (slug: string) => ({ slug, deletedAt: null });
-const binned = (slug: string) => ({ slug, deletedAt: new Date('2026-09-22') });
+const live = (slug: string) => ({ id: `id-${slug}`, slug, deletedAt: null });
+const binned = (slug: string) => ({ id: `id-${slug}`, slug, deletedAt: new Date('2026-09-22') });
 
 describe('a live target', () => {
   it('resolves inside the market being viewed', () => {
@@ -42,7 +42,7 @@ describe('a live target', () => {
       '/blog/a-post',
     );
     expect(
-      navHref(item({ linkType: 'BLOG_CATEGORY', blogCategory: { slug: 'news' } }), root),
+      navHref(item({ linkType: 'BLOG_CATEGORY', blogCategory: { id: 'id-news', slug: 'news' } }), root),
     ).toBe('/blog/category/news');
   });
 

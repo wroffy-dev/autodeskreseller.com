@@ -9,7 +9,7 @@ import { sanitizeText, safeUrl } from '@/lib/utils/sanitize';
 import { encryptSecret } from '@/lib/utils/crypto';
 import { verifySmtp, sendMail } from '@/lib/email/mailer';
 import { success, failure, toActionError, type ActionResult } from '@/lib/utils/result';
-import { CMS_ICON_NAMES } from '@/components/ui/icons';
+import { isCmsIconName } from '@/components/ui/icon-names';
 import { HEX_COLOR } from '@/lib/cms/color';
 
 const optional = (max: number) =>
@@ -108,7 +108,7 @@ const iconName = z
   .trim()
   .optional()
   .transform((v) => (v ?? '').toLowerCase())
-  .refine((v) => v === '' || CMS_ICON_NAMES.includes(v), 'Choose an icon from the list');
+  .refine((v) => v === '' || isCmsIconName(v), 'Choose an icon from the list');
 
 const buttonVariant = z.enum([
   'primary',

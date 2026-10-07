@@ -14,7 +14,9 @@ import type { BuilderSection } from '@/components/cms/section-builder';
 import { ContentStatusBadge } from '@/components/admin/lead-status-badge';
 import { buttonClasses } from '@/components/ui/button';
 import { getCountryById, getDefaultCountry, listActiveCountries } from '@/lib/country/registry';
-import { countryPath } from '@/lib/country/routing';
+import { postPath } from '@/lib/cms/blog-render';
+import { getUrlSnapshot } from '@/lib/urls/load';
+import { effectivePattern, patternHint } from '@/lib/urls/hints';
 import { parseBlockContent } from '@/lib/cms/blocks';
 
 export const dynamic = 'force-dynamic';
@@ -79,7 +81,10 @@ export default async function EditPost({ params }: { params: Promise<{ id: strin
     getCountryById(post.countryId).then(async (row) => row ?? (await getDefaultCountry())),
     listActiveCountries(),
   ]);
-  const publicPath = countryPath(country, `blog/${post.slug}`);
+  // Where the article lives, from the URL registry. The blog is root-only, so
+  // an article in another market has no address of its own.
+  await getUrlSnapshot();
+  const publicPath = postPath(post);
 
   const initial: PostFormValues = {
     id: post.id,
@@ -102,7 +107,11 @@ export default async function EditPost({ params }: { params: Promise<{ id: strin
     sidebarMode: post.sidebarMode,
     seoTitle: post.seoTitle ?? '',
     seoDescription: post.seoDescription ?? '',
-    focusKeyword: post.focusKeyword ?? '',
+    // The migration copied every focus keyword into keyword 1; the fallback
+    // covers an article saved by an older build in between.
+    primaryKeyword1: post.primaryKeyword1 ?? post.focusKeyword ?? '',
+    primaryKeyword2: post.primaryKeyword2 ?? '',
+    primaryKeyword3: post.primaryKeyword3 ?? '',
     canonicalUrl: post.canonicalUrl ?? '',
     noIndex: post.noIndex,
     noFollow: post.noFollow,
@@ -166,6 +175,7 @@ export default async function EditPost({ params }: { params: Promise<{ id: strin
         canPublish={userCan(user, 'blog.publish')}
         canEdit={userCan(user, 'blog.edit')}
         mode="edit"
+        urlHint={patternHint(await effectivePattern('BLOG_POST', null))}
         sidebarSlot={
           post.sidebarMode === 'CUSTOM' ? (
             <PostSidebarBuilder
