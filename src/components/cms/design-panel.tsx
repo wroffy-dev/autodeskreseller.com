@@ -19,6 +19,7 @@ import { Field, Input, Select, Switch, Label } from '@/components/ui/field';
 import { MediaPicker } from '@/components/admin/media-picker';
 import { UnitInput, BoxInput, ColorInput, DesignGroup } from './design-controls';
 import { cn } from '@/lib/utils/cn';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 
 const BREAKPOINT_ICON: Record<Breakpoint, typeof Monitor> = {
   desktop: Monitor,
@@ -104,33 +105,23 @@ export function DesignPanel({
       {/* Breakpoint switch — scopes the spacing/layout groups below. */}
       {showResponsive ? (
         <>
-          <div className="flex items-center gap-1 rounded-lg bg-muted/[0.06] p-1">
-            {BREAKPOINTS.map((bp) => {
+          <SegmentedControl
+            label="Screen size"
+            size="sm"
+            fullWidth
+            value={breakpoint}
+            onChange={setBreakpoint}
+            options={BREAKPOINTS.map((bp) => {
               const Icon = BREAKPOINT_ICON[bp];
-              const active = breakpoint === bp;
               const overrides = countOverrides(design[bp]);
-              return (
-                <button
-                  key={bp}
-                  type="button"
-                  onClick={() => setBreakpoint(bp)}
-                  aria-pressed={active}
-                  className={cn(
-                    'flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
-                    active ? 'bg-surface text-content shadow-sm' : 'text-muted hover:text-content',
-                  )}
-                >
-                  <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                  {BREAKPOINT_LABELS[bp]}
-                  {bp !== 'desktop' && overrides > 0 ? (
-                    <span className="rounded-full bg-brand/15 px-1.5 text-[0.625rem] font-semibold text-brand">
-                      {overrides}
-                    </span>
-                  ) : null}
-                </button>
-              );
+              return {
+                value: bp,
+                label: BREAKPOINT_LABELS[bp],
+                icon: <Icon className="h-3.5 w-3.5" aria-hidden="true" />,
+                badge: bp !== 'desktop' && overrides > 0 ? overrides : undefined,
+              };
             })}
-          </div>
+          />
 
           <p className="text-xs text-muted">
             {isDesktop

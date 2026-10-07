@@ -27,6 +27,7 @@ import {
   type PostToggle,
 } from '@/lib/cms/blog-settings';
 import { EMPTY_POST, type PostFormValues } from '@/lib/cms/post-model';
+import { DateTimeField } from '@/components/ui/date-field';
 
 // Re-exported so existing imports from this module keep working; the values
 // themselves now come from a server-safe module.
@@ -630,11 +631,12 @@ export function PostForm({
                 error={errors.publishedAt}
                 required={values.status === 'SCHEDULED'}
               >
-                <Input
+                <DateTimeField
                   id="post-published"
-                  type="datetime-local"
+                  label={values.status === 'SCHEDULED' ? 'Publish at' : 'Published date'}
                   value={values.publishedAt}
-                  onChange={(e) => set('publishedAt', e.target.value)}
+                  invalid={!!errors.publishedAt}
+                  onChange={(next) => set('publishedAt', next)}
                 />
               </Field>
 

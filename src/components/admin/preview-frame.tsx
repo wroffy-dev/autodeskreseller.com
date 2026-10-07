@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Monitor, Tablet, Smartphone, RotateCw, ExternalLink, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 
 /**
  * Device widths used by the preview. They match the breakpoints the section
@@ -45,29 +46,21 @@ export function PreviewFrame({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex flex-wrap items-center gap-2 border-b border-hairline bg-surface px-4 py-2.5">
-        <div className="flex items-center gap-1 rounded-lg bg-muted/[0.06] p-1">
-          {DEVICES.map((option) => {
+        <SegmentedControl
+          label="Preview width"
+          size="sm"
+          value={device}
+          onChange={setDevice}
+          options={DEVICES.map((option) => {
             const Icon = option.icon;
-            return (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => setDevice(option.id)}
-                aria-pressed={device === option.id}
-                title={option.width ? `${option.label} — ${option.width}px` : option.label}
-                className={cn(
-                  'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
-                  device === option.id
-                    ? 'bg-surface text-content shadow-sm'
-                    : 'text-muted hover:text-content',
-                )}
-              >
-                <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                {option.label}
-              </button>
-            );
+            return {
+              value: option.id,
+              label: option.label,
+              title: option.width ? `${option.label} — ${option.width}px` : option.label,
+              icon: <Icon className="h-3.5 w-3.5" aria-hidden="true" />,
+            };
           })}
-        </div>
+        />
 
         <span className="text-xs text-muted">
           {active.width ? `${active.width}px wide` : 'Full width'}

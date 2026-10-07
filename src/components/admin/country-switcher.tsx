@@ -43,7 +43,7 @@ export function AdminCountrySwitcher({
   return (
     <Menu
       align="right"
-      label="Country"
+      label={`Country: ${current.name}`}
       triggerClassName="admin-focus admin-focus-header"
       trigger={
         <span
@@ -55,7 +55,9 @@ export function AdminCountrySwitcher({
         >
           <Globe className="h-4 w-4 text-admin-nav/70" aria-hidden="true" />
           <span className="hidden text-admin-nav/60 sm:inline">Country:</span>
-          <span className="font-medium">{current.name}</span>
+          {/* The code on phones, where a long market name would crowd the bar. */}
+          <span className="font-medium sm:hidden">{current.code}</span>
+          <span className="hidden max-w-[10rem] truncate font-medium sm:inline">{current.name}</span>
           <ChevronDown className="h-3.5 w-3.5 text-admin-nav/60" aria-hidden="true" />
         </span>
       }

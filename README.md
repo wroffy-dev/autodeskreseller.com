@@ -39,6 +39,7 @@ information.
 - [Cities](docs/CITIES.md)
 - [URL registry and Slug & URL Manager](docs/URL-REGISTRY.md)
 - [SEO Intelligence](docs/SEO-INTELLIGENCE.md)
+- [Admin design system](docs/ADMIN-DESIGN-SYSTEM.md)
 - [Versioning and releases](VERSION_README.md)
 - [Changelog](CHANGELOG.md)
 

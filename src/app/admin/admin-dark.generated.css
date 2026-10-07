@@ -34,16 +34,8 @@
   background-color: rgb(239 68 68 / 0.14);
 }
 
-:root[data-admin-theme='dark'] .admin-ui .bg-rose-50 {
-  background-color: rgb(244 63 94 / 0.14);
-}
-
 :root[data-admin-theme='dark'] .admin-ui .bg-sky-50 {
   background-color: rgb(14 165 233 / 0.14);
-}
-
-:root[data-admin-theme='dark'] .admin-ui .bg-teal-50 {
-  background-color: rgb(20 184 166 / 0.14);
 }
 
 :root[data-admin-theme='dark'] .admin-ui .bg-violet-50 {
@@ -68,6 +60,10 @@
 
 :root[data-admin-theme='dark'] .admin-ui .border-sky-200 {
   border-color: rgb(14 165 233 / 0.35);
+}
+
+:root[data-admin-theme='dark'] .admin-ui .hover\:bg-red-100:hover {
+  background-color: rgb(239 68 68 / 0.14);
 }
 
 :root[data-admin-theme='dark'] .admin-ui .hover\:bg-red-50:hover {
@@ -146,10 +142,6 @@
   color: rgb(252 165 165);
 }
 
-:root[data-admin-theme='dark'] .admin-ui .text-rose-700 {
-  color: rgb(253 164 175);
-}
-
 :root[data-admin-theme='dark'] .admin-ui .text-sky-600 {
   color: rgb(56 189 248);
 }
@@ -164,10 +156,6 @@
 
 :root[data-admin-theme='dark'] .admin-ui .text-sky-900 {
   color: rgb(125 211 252);
-}
-
-:root[data-admin-theme='dark'] .admin-ui .text-teal-700 {
-  color: rgb(94 234 212);
 }
 
 :root[data-admin-theme='dark'] .admin-ui .text-violet-700 {

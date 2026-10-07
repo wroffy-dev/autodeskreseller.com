@@ -42,6 +42,58 @@
   /* Glass: two channels retune the whole glass family per theme */
   --glass-tint: 255 255 255;
   --shadow-ink: 15 23 42;
+  /* How opaque each glass role is, and how much it diffuses what is behind.
+     Chrome is the most transparent; anything that sits over content (menus,
+     the search panel, popovers) is nearly opaque so its text stays crisp. */
+  --glass-alpha-bar: 0.72;
+  --glass-alpha-rail: 0.7;
+  --glass-alpha-card: 0.7;
+  --glass-alpha-menu: 0.88;
+  --glass-alpha-popover: 0.95;
+  --glass-blur-bar: 20px;
+  --glass-blur-menu: 18px;
+  --glass-saturate: 180%;
+  /* The bright top edge that makes glass read as a raised sheet */
+  --glass-edge: rgb(255 255 255 / 0.7);
+  --glass-highlight: rgb(255 255 255 / 0.8);
+
+  /* Controls: Apple-style fills for search fields, switch and segment tracks */
+  --control-fill: 118 118 128;
+  --control-fill-alpha: 0.12;
+  --control-border: 190 195 204;
+  --segment-thumb: 255 255 255;
+  /* An unchecked switch's outline, strong enough to read as a control */
+  --switch-off-ring: rgb(99 104 115 / 0.7);
+
+  /* Focus: one ring for every interactive element */
+  --focus: var(--accent);
+  --focus-ring: 0 0 0 3px rgb(var(--focus) / 0.35);
+
+  /* Semantic states (text-safe on --surface in both themes) */
+  --success: 21 128 61;
+  --warning: 180 83 9;
+  --danger: 220 38 38;
+  --info: var(--accent);
+
+  /* Typography scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.125rem;
+  --text-title: 1.75rem;
+
+  /* Spacing scale (4px base) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  /* Motion: short and restrained; reduced-motion turns it off globally */
+  --motion-fast: 150ms;
+  --motion-base: 200ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   /* Radius */
   --radius-shell: 24px;
@@ -103,31 +155,31 @@ body.admin-ui {
 
 /* Topbar: the strongest glass */
 .admin-ui .glass-bar {
-  background: rgb(var(--glass-tint) / 0.72);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgb(var(--glass-tint) / 0.7);
+  background: rgb(var(--glass-tint) / var(--glass-alpha-bar));
+  backdrop-filter: blur(var(--glass-blur-bar)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur-bar)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-edge);
   box-shadow:
     0 1px 2px rgb(var(--shadow-ink) / 0.04),
     0 8px 24px rgb(var(--shadow-ink) / 0.06),
-    inset 0 1px 0 rgb(var(--glass-tint) / 0.8);
+    inset 0 1px 0 var(--glass-highlight);
 }
 
 /* Sidebar rail */
 .admin-ui .glass-rail {
-  background: rgb(var(--glass-tint) / 0.68);
-  backdrop-filter: blur(22px) saturate(170%);
-  -webkit-backdrop-filter: blur(22px) saturate(170%);
-  border: 1px solid rgb(var(--glass-tint) / 0.7);
+  background: rgb(var(--glass-tint) / var(--glass-alpha-rail));
+  backdrop-filter: blur(var(--glass-blur-bar)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur-bar)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-edge);
   box-shadow:
     0 1px 2px rgb(var(--shadow-ink) / 0.04),
     0 12px 32px rgb(var(--shadow-ink) / 0.06),
-    inset 0 1px 0 rgb(var(--glass-tint) / 0.8);
+    inset 0 1px 0 var(--glass-highlight);
 }
 
 /* KPI cards, filter bars */
 .admin-ui .glass-card {
-  background: rgb(var(--glass-tint) / 0.7);
+  background: rgb(var(--glass-tint) / var(--glass-alpha-card));
   backdrop-filter: blur(14px) saturate(150%);
   -webkit-backdrop-filter: blur(14px) saturate(150%);
   border: 1px solid rgb(var(--glass-tint) / 0.75);
@@ -136,12 +188,19 @@ body.admin-ui {
 
 /* Menus and popovers: the most opaque, since they sit over anything */
 .admin-ui .glass-menu {
-  background: rgb(var(--glass-tint) / 0.86);
-  backdrop-filter: blur(18px) saturate(180%);
-  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  background: rgb(var(--glass-tint) / var(--glass-alpha-menu));
+  backdrop-filter: blur(var(--glass-blur-menu)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur-menu)) saturate(var(--glass-saturate));
   border: 1px solid rgb(var(--border) / 0.9);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 var(--glass-highlight);
   border-radius: var(--radius-menu);
+}
+
+/* Popovers (date pickers): glass in name only — almost opaque, because a
+   calendar grid is dense content and must not show the page through it. */
+.admin-ui .ui-popover {
+  background: rgb(var(--glass-tint) / var(--glass-alpha-popover));
+  border-radius: var(--radius-dialog);
 }
 
 /* Overview panels on the dashboard (`<Card glass>`) */
@@ -179,7 +238,8 @@ body.admin-ui {
   .admin-ui .glass-rail,
   .admin-ui .glass-card,
   .admin-ui .glass-menu,
-  .admin-ui .glass-panel {
+  .admin-ui .glass-panel,
+  .admin-ui .ui-popover {
     background: rgb(var(--glass-tint) / 0.97);
   }
 }
@@ -188,10 +248,15 @@ body.admin-ui {
   .admin-ui .glass-rail,
   .admin-ui .glass-card,
   .admin-ui .glass-menu,
-  .admin-ui .glass-panel {
+  .admin-ui .glass-panel,
+  .admin-ui .ui-popover,
+  .admin-ui .admin-scrim {
     background: rgb(var(--glass-tint) / 0.97);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
+  }
+  .admin-ui .admin-scrim {
+    background: rgb(var(--shadow-ink) / 0.5);
   }
 }
 
@@ -325,15 +390,18 @@ body.admin-ui {
 /* Inputs, selects, textareas: same radius as buttons, accent focus ring */
 .admin-ui .ui-control {
   border-radius: var(--radius-control);
-  border-color: rgb(var(--border));
+  border-color: rgb(var(--control-border));
   box-shadow: var(--shadow-sm);
 }
 .admin-ui .ui-control::placeholder {
-  color: rgb(var(--text-muted) / 0.75);
+  /* Full muted, not faded: placeholders here carry formats (DD/MM/YYYY) and
+     examples, so they must meet 4.5:1 like any other hint text. */
+  color: rgb(var(--text-muted));
 }
-.admin-ui .ui-control:focus {
-  border-color: rgb(var(--accent) / 0.7);
-  --tw-ring-color: rgb(var(--accent) / 0.25);
+.admin-ui .ui-control:focus,
+.admin-ui .ui-date-field:focus-within {
+  border-color: rgb(var(--accent) / 0.8);
+  --tw-ring-color: rgb(var(--accent) / 0.3);
 }
 .admin-ui .ui-control[aria-invalid='true'] {
   border-color: rgb(239 68 68);
@@ -431,6 +499,21 @@ body.admin-ui {
   --nav-guide: rgb(255 255 255 / 0.1);
   --glass-tint: 30 33 40;
   --shadow-ink: 0 0 0;
+  /* Smoked glass: a touch more opaque than light glass, because bright
+     content behind a dark sheet shows through more strongly. */
+  --glass-alpha-bar: 0.76;
+  --glass-alpha-rail: 0.74;
+  --glass-alpha-menu: 0.9;
+  --glass-alpha-popover: 0.96;
+  --glass-edge: rgb(255 255 255 / 0.08);
+  --glass-highlight: rgb(255 255 255 / 0.06);
+  --control-fill-alpha: 0.24;
+  --control-border: 88 95 108;
+  --segment-thumb: 72 76 86;
+  --switch-off-ring: rgb(156 163 175 / 0.6);
+  --success: 74 222 128;
+  --warning: 251 191 36;
+  --danger: 248 113 113;
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4), 0 1px 3px rgb(0 0 0 / 0.3);
   --shadow-md: 0 2px 6px rgb(0 0 0 / 0.35), 0 10px 28px rgb(0 0 0 / 0.4);
   --shadow-lg: 0 6px 16px rgb(0 0 0 / 0.4), 0 28px 64px rgb(0 0 0 / 0.55);
@@ -503,4 +586,201 @@ body.admin-ui {
    fall below 4.5:1, so it is lifted towards white. Fills keep the real brand. */
 :root[data-admin-theme='dark'] .admin-ui :is(.text-brand, .hover\:text-brand:hover, .group:hover .group-hover\:text-brand) {
   color: color-mix(in srgb, rgb(var(--brand-primary)) 62%, white);
+}
+
+/* -------------------------------------------------------------------------
+ * 7. Controls
+ *
+ * The shared switch, segmented control, topbar search, theme switch and
+ * calendar. Track and field fills use the Apple-style `--control-fill` at
+ * `--control-fill-alpha`, which the dark theme raises so they stay visible.
+ * ---------------------------------------------------------------------- */
+
+/* One focus treatment for the new controls */
+.admin-ui .admin-focus-ring:focus-visible {
+  outline: 2px solid rgb(var(--focus));
+  outline-offset: 2px;
+  /* Replaces the app-wide focus ring rather than doubling it. */
+  box-shadow: none;
+}
+
+/* Switch: brand track when on; a filled track with a visible outline when off,
+   so an unchecked switch still reads as a control and not as empty space. */
+.admin-ui .ui-switch[data-state='off'] {
+  background-color: rgb(var(--control-fill) / calc(var(--control-fill-alpha) + 0.06));
+  box-shadow: inset 0 0 0 1px var(--switch-off-ring);
+}
+.admin-ui .ui-switch-knob {
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.18),
+    0 2px 6px rgb(0 0 0 / 0.12);
+}
+.admin-ui .ui-switch:focus-visible {
+  --tw-ring-color: rgb(var(--focus) / 0.7);
+  --tw-ring-offset-color: rgb(var(--surface));
+}
+
+/* Segmented control */
+.admin-ui .ui-segmented {
+  background-color: rgb(var(--control-fill) / var(--control-fill-alpha));
+}
+.admin-ui .ui-segmented-thumb {
+  background-color: rgb(var(--segment-thumb));
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.12),
+    0 0 0 0.5px rgb(0 0 0 / 0.04);
+}
+.admin-ui .ui-segmented-badge {
+  background-color: rgb(var(--control-fill) / 0.16);
+  color: rgb(var(--text-muted));
+}
+.admin-ui [data-selected] > .ui-segmented-badge {
+  background-color: rgb(var(--accent) / 0.14);
+  color: rgb(var(--accent));
+}
+
+/* Topbar search field and its results panel */
+.admin-ui .search-field {
+  background-color: rgb(var(--control-fill) / var(--control-fill-alpha));
+  box-shadow: inset 0 0 0 1px rgb(var(--control-fill) / 0.06);
+  transition:
+    background-color var(--motion-fast) var(--ease-out),
+    box-shadow var(--motion-fast) var(--ease-out);
+}
+.admin-ui .search-field:focus-within {
+  background-color: rgb(var(--surface));
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--accent) / 0.7),
+    var(--focus-ring);
+}
+.admin-ui .search-panel {
+  border-radius: var(--radius-menu);
+}
+.admin-ui .search-option-active {
+  background-color: rgb(var(--accent) / 0.1);
+}
+.admin-ui .search-kbd {
+  border-radius: 0.375rem;
+  border: 1px solid rgb(var(--border));
+  background-color: rgb(var(--surface));
+  padding: 0.0625rem 0.375rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.625rem;
+  line-height: 1rem;
+  color: rgb(var(--text-muted));
+  box-shadow: 0 1px 0 rgb(var(--border));
+}
+
+/* Theme switch: sun on the left, moon on the right, a thumb that slides over
+   the active one. The position comes from <html data-admin-theme>, which is set
+   before first paint, so the switch never renders on the wrong side. */
+.admin-ui .theme-switch {
+  background-color: rgb(var(--control-fill) / var(--control-fill-alpha));
+  box-shadow: inset 0 0 0 1px rgb(var(--control-fill) / 0.12);
+  color: rgb(var(--text-muted));
+}
+.admin-ui .theme-switch:hover {
+  background-color: rgb(var(--control-fill) / calc(var(--control-fill-alpha) + 0.06));
+}
+.admin-ui .theme-switch-thumb {
+  background-color: rgb(255 255 255);
+  color: rgb(217 119 6);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.16),
+    0 3px 8px rgb(0 0 0 / 0.1);
+  transition:
+    transform var(--motion-base) var(--ease-out),
+    background-color var(--motion-base) var(--ease-out);
+}
+.admin-ui .theme-switch-thumb-moon {
+  display: none;
+}
+.admin-ui .theme-switch-icon {
+  display: flex;
+}
+:root[data-admin-theme='dark'] .admin-ui .theme-switch-thumb {
+  transform: translateX(1.75rem);
+  background-color: rgb(58 62 72);
+  color: rgb(226 232 240);
+}
+:root[data-admin-theme='dark'] .admin-ui .theme-switch-thumb-sun {
+  display: none;
+}
+:root[data-admin-theme='dark'] .admin-ui .theme-switch-thumb-moon {
+  display: block;
+}
+
+/* The one-off cross-fade a theme switch triggers (View Transitions) */
+html:has(body.admin-ui)::view-transition-old(root),
+html:has(body.admin-ui)::view-transition-new(root) {
+  animation-duration: 180ms;
+  animation-timing-function: ease-out;
+}
+
+/* Date fields: the frame is the control, the text box inside is borderless */
+.admin-ui .ui-date-field {
+  overflow: hidden;
+}
+.admin-ui .ui-date-field[data-invalid] {
+  border-color: rgb(var(--danger));
+}
+
+/* Calendar */
+.admin-ui .ui-calendar-day[data-today]:not([data-selected]) {
+  color: rgb(var(--accent));
+  box-shadow: inset 0 0 0 1px rgb(var(--accent) / 0.45);
+}
+.admin-ui .ui-calendar-day[data-selected] {
+  background-color: rgb(var(--accent));
+  color: rgb(255 255 255);
+  font-weight: 600;
+}
+.admin-ui .ui-calendar-day:focus-visible {
+  outline: 2px solid rgb(var(--focus));
+  outline-offset: 1px;
+  box-shadow: none;
+}
+.admin-ui .ui-calendar-range {
+  background-color: rgb(var(--accent) / 0.12);
+}
+.admin-ui .ui-calendar-range-start {
+  border-radius: 999px 0 0 999px;
+}
+.admin-ui .ui-calendar-range-end {
+  border-radius: 0 999px 999px 0;
+}
+.admin-ui .ui-calendar-range-start.ui-calendar-range-end {
+  border-radius: 999px;
+}
+.admin-ui .ui-calendar-dot {
+  background-color: rgb(var(--accent));
+}
+.admin-ui .ui-calendar-day[data-selected] .ui-calendar-dot {
+  background-color: rgb(255 255 255);
+}
+.admin-ui .ui-calendar-month[aria-pressed='true'] {
+  background-color: rgb(var(--accent));
+  color: rgb(255 255 255);
+}
+.admin-ui .ui-calendar-event-date {
+  background-color: rgb(var(--accent) / 0.12);
+  color: rgb(var(--accent));
+}
+:root[data-admin-theme='dark'] .admin-ui :is(.ui-calendar-day[data-today]:not([data-selected]), .ui-calendar-event-date) {
+  color: color-mix(in srgb, rgb(var(--brand-primary)) 62%, white);
+}
+
+/* Phone sheets keep a solid surface; there is nothing behind them worth seeing */
+.admin-ui .ui-popover-sheet {
+  background-color: rgb(var(--surface));
+  box-shadow: var(--shadow-lg);
+}
+/* A range that wraps onto the next week reads as one band per row */
+.admin-ui td.ui-calendar-range:first-child {
+  border-top-left-radius: 999px;
+  border-bottom-left-radius: 999px;
+}
+.admin-ui td.ui-calendar-range:last-child {
+  border-top-right-radius: 999px;
+  border-bottom-right-radius: 999px;
 }

@@ -38,6 +38,7 @@ import { flattenTree } from '@/lib/utils/tree';
 import { BulkBar } from '@/components/admin/row-menu';
 import { FolderInput } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 
 export function MediaLibrary({
   initialItems,
@@ -225,36 +226,27 @@ export function MediaLibrary({
               <option value="VIDEO">Video</option>
             </Select>
           </div>
-          <div
-            role="group"
-            aria-label="Layout"
-            className="flex shrink-0 items-center gap-0.5 rounded-lg border border-hairline p-0.5 sm:ml-auto"
-          >
-            {(
-              [
-                { id: 'grid', label: 'Grid view', Icon: LayoutGrid },
-                { id: 'list', label: 'List view', Icon: ListIcon },
-              ] as const
-            ).map(({ id, label, Icon }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => chooseView(id)}
-                aria-pressed={view === id}
-                aria-label={label}
-                title={label}
-                className={cn(
-                  'rounded-md p-1.5 transition-colors',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
-                  view === id
-                    ? 'bg-brand/10 text-brand'
-                    : 'text-muted hover:bg-muted/10 hover:text-content',
-                )}
-              >
-                <Icon className="h-4 w-4" aria-hidden="true" />
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            label="Layout"
+            size="sm"
+            className="shrink-0 sm:ml-auto"
+            value={view}
+            onChange={chooseView}
+            options={[
+              {
+                value: 'grid',
+                label: null,
+                ariaLabel: 'Grid view',
+                icon: <LayoutGrid className="h-4 w-4" aria-hidden="true" />,
+              },
+              {
+                value: 'list',
+                label: null,
+                ariaLabel: 'List view',
+                icon: <ListIcon className="h-4 w-4" aria-hidden="true" />,
+              },
+            ]}
+          />
 
           {can.upload ? (
             <Button onClick={() => inputRef.current?.click()} disabled={uploading}>

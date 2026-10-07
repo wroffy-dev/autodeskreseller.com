@@ -1,13 +1,17 @@
 'use client';
 
 import * as React from 'react';
-import { cn } from '@/lib/utils/cn';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 
 export type AdminTab = { id: string; label: string; badge?: number | string };
 
 /**
  * Horizontal tab strip used by every large edit screen, so a long form becomes
  * a few short ones instead of one overwhelming page.
+ *
+ * Drawn by the shared segmented control as an underlined strip with a sliding
+ * indicator; it keeps the `tab-*` / `panel-*` ids `TabPanel` pairs with, and
+ * scrolls inside itself when there are more tabs than room.
  */
 export function AdminTabs({
   tabs,
@@ -20,68 +24,22 @@ export function AdminTabs({
   onChange: (id: string) => void;
   className?: string;
 }) {
-  const refs = React.useRef<Record<string, HTMLButtonElement | null>>({});
-
-  const onKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
-    event.preventDefault();
-    const index = tabs.findIndex((tab) => tab.id === active);
-    const next =
-      event.key === 'ArrowRight'
-        ? tabs[(index + 1) % tabs.length]
-        : tabs[(index - 1 + tabs.length) % tabs.length];
-    if (!next) return;
-    onChange(next.id);
-    refs.current[next.id]?.focus();
-  };
-
   return (
-    <div
-      role="tablist"
-      aria-orientation="horizontal"
-      onKeyDown={onKeyDown}
-      className={cn('scroll-x flex items-center gap-1 border-b border-hairline', className)}
-    >
-      {tabs.map((tab) => {
-        const selected = tab.id === active;
-        return (
-          <button
-            key={tab.id}
-            ref={(node) => {
-              refs.current[tab.id] = node;
-            }}
-            type="button"
-            role="tab"
-            id={`tab-${tab.id}`}
-            aria-selected={selected}
-            aria-controls={`panel-${tab.id}`}
-            tabIndex={selected ? 0 : -1}
-            onClick={() => onChange(tab.id)}
-            className={cn(
-              'relative shrink-0 whitespace-nowrap px-3 py-2.5 text-sm transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1',
-              selected ? 'font-medium text-brand' : 'text-muted hover:text-content',
-            )}
-          >
-            <span className="flex items-center gap-1.5">
-              {tab.label}
-              {tab.badge !== undefined && tab.badge !== 0 ? (
-                <span className="rounded-full bg-muted/15 px-1.5 text-[0.6875rem] font-semibold text-muted">
-                  {tab.badge}
-                </span>
-              ) : null}
-            </span>
-            <span
-              aria-hidden="true"
-              className={cn(
-                'absolute inset-x-1 -bottom-px h-0.5 rounded-full transition-colors',
-                selected ? 'bg-brand' : 'bg-transparent',
-              )}
-            />
-          </button>
-        );
-      })}
-    </div>
+    <SegmentedControl
+      semantics="tabs"
+      variant="underline"
+      label="Sections"
+      idPrefix="tab-"
+      panelId={(id) => `panel-${id}`}
+      value={active}
+      onChange={onChange}
+      className={className}
+      options={tabs.map((tab) => ({
+        value: tab.id,
+        label: tab.label,
+        badge: tab.badge !== undefined && tab.badge !== 0 ? tab.badge : undefined,
+      }))}
+    />
   );
 }
 

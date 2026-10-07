@@ -20,7 +20,7 @@ import { AdminSearch } from './admin-search';
 import { AdminBreadcrumbs } from './breadcrumbs';
 import { AdminCountrySwitcher } from './country-switcher';
 import { Menu, MenuItem, MenuLabel, MenuSeparator } from '@/components/ui/menu';
-import { ThemeMenuItems, ThemeToggle, useAdminTheme } from './theme';
+import { ThemeMenuItems, ThemeSwitch, useAdminTheme } from './theme';
 import type { CountryContext } from '@/lib/country/types';
 
 /** Create shortcuts, each gated by the permission its destination requires. */
@@ -93,12 +93,14 @@ export function AdminTopbar({
             <PanelLeft className="h-5 w-5" />
           </button>
 
-          {/* Breadcrumbs take the space on desktop; search owns it on mobile. */}
+          {/* Breadcrumbs take the space on desktop; search owns it on tablets,
+              and on phones it is a button that opens a full-screen sheet. */}
           <div className="hidden min-w-0 flex-1 pl-2 lg:block">
             <AdminBreadcrumbs />
           </div>
+          <div className="min-w-0 flex-1 sm:hidden" aria-hidden="true" />
 
-          <div className="min-w-0 flex-1 lg:max-w-xs lg:flex-none xl:w-80 xl:max-w-none">
+          <div className="shrink-0 sm:min-w-0 sm:flex-1 lg:w-56 lg:flex-none xl:w-64 2xl:w-80">
             <AdminSearch permissions={permissions} isSuperAdmin={isSuperAdmin} />
           </div>
 
@@ -133,10 +135,7 @@ export function AdminTopbar({
             </Menu>
           ) : null}
 
-          {/* On phones the theme choice lives in the profile menu instead. */}
-          <div className="hidden sm:block">
-            <ThemeToggle />
-          </div>
+          <ThemeSwitch className="hidden min-[360px]:inline-flex" />
 
           <a
             href="/"
@@ -193,12 +192,11 @@ export function AdminTopbar({
             <MenuItem href="/admin/profile?tab=security" icon={<ShieldCheck className="h-4 w-4" />}>
               Security
             </MenuItem>
-            {/* The topbar toggle is hidden on phones, so the theme lives here. */}
-            <div className="sm:hidden">
-              <MenuSeparator />
-              <MenuLabel>Theme</MenuLabel>
-              <ThemeMenuItems preference={preference} onSelect={setPreference} />
-            </div>
+            {/* Light, Dark, or following the system — the switch in the bar
+                sets an explicit choice; this is where "System" lives. */}
+            <MenuSeparator />
+            <MenuLabel>Appearance</MenuLabel>
+            <ThemeMenuItems preference={preference} onSelect={setPreference} />
             <MenuSeparator />
             <MenuItem href="/" external icon={<ExternalLink className="h-4 w-4" />}>
               View website

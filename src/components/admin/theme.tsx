@@ -8,13 +8,16 @@ import {
   DARK_QUERY,
   isThemePreference,
   resolveTheme,
+  type AdminAppliedTheme,
   type AdminThemePreference,
 } from '@/lib/admin/theme';
-import { Menu, MenuItem } from '@/components/ui/menu';
+import { MenuItem } from '@/components/ui/menu';
 
 type ThemeContextValue = {
   /** `null` until mounted, so server and client markup agree. */
   preference: AdminThemePreference | null;
+  /** What is on screen — `null` until mounted, for the same reason. */
+  applied: AdminAppliedTheme | null;
   setPreference: (next: AdminThemePreference) => void;
 };
 
@@ -30,9 +33,35 @@ export const THEME_OPTIONS: Array<{
   { value: 'system', label: 'System', icon: Monitor },
 ];
 
-function apply(preference: AdminThemePreference) {
+function apply(preference: AdminThemePreference, animate = false) {
   const dark = window.matchMedia(DARK_QUERY).matches;
-  document.documentElement.setAttribute(ADMIN_THEME_ATTRIBUTE, resolveTheme(preference, dark));
+  const next = resolveTheme(preference, dark);
+  const root = document.documentElement;
+  if (root.getAttribute(ADMIN_THEME_ATTRIBUTE) === next) return;
+  const swap = () => root.setAttribute(ADMIN_THEME_ATTRIBUTE, next);
+
+  /*
+   * A deliberate switch cross-fades the whole page once, as a single snapshot,
+   * instead of putting a colour transition on every element: nothing else is
+   * animated, nothing waits for it, and input keeps working throughout.
+   * Skipped when motion is reduced or the browser has no View Transitions.
+   */
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const start = (
+    document as Document & {
+      startViewTransition?: (callback: () => void) => unknown;
+    }
+  ).startViewTransition;
+  if (animate && !reduced && typeof start === 'function') {
+    start.call(document, swap);
+  } else {
+    swap();
+  }
+}
+
+/** The theme actually applied right now, read from <html>. */
+function appliedTheme(): AdminAppliedTheme {
+  return document.documentElement.getAttribute(ADMIN_THEME_ATTRIBUTE) === 'dark' ? 'dark' : 'light';
 }
 
 /**
@@ -45,6 +74,7 @@ function apply(preference: AdminThemePreference) {
  */
 export function AdminThemeProvider({ children }: { children: React.ReactNode }) {
   const [preference, setPreferenceState] = React.useState<AdminThemePreference | null>(null);
+  const [applied, setApplied] = React.useState<AdminAppliedTheme | null>(null);
 
   React.useEffect(() => {
     let stored: string | null = null;
@@ -58,15 +88,32 @@ export function AdminThemeProvider({ children }: { children: React.ReactNode }) 
     // Covers a client-side navigation into the admin, where the inline script
     // in the layout has not run.
     apply(initial);
+    setApplied(appliedTheme());
   }, []);
 
   React.useEffect(() => {
     if (preference !== 'system') return;
     const query = window.matchMedia(DARK_QUERY);
-    const onChange = () => apply('system');
+    const onChange = () => {
+      apply('system', true);
+      setApplied(appliedTheme());
+    };
     query.addEventListener('change', onChange);
     return () => query.removeEventListener('change', onChange);
   }, [preference]);
+
+  // A choice made in another tab follows here too.
+  React.useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== ADMIN_THEME_KEY) return;
+      const next = isThemePreference(event.newValue) ? event.newValue : 'system';
+      setPreferenceState(next);
+      apply(next);
+      setApplied(appliedTheme());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const setPreference = React.useCallback((next: AdminThemePreference) => {
     setPreferenceState(next);
@@ -75,10 +122,14 @@ export function AdminThemeProvider({ children }: { children: React.ReactNode }) 
     } catch {
       // The choice applies for this visit but will not persist.
     }
-    apply(next);
+    apply(next, true);
+    setApplied(resolveTheme(next, window.matchMedia(DARK_QUERY).matches));
   }, []);
 
-  const value = React.useMemo(() => ({ preference, setPreference }), [preference, setPreference]);
+  const value = React.useMemo(
+    () => ({ preference, applied, setPreference }),
+    [preference, applied, setPreference],
+  );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
@@ -89,32 +140,58 @@ export function useAdminTheme(): ThemeContextValue {
   return context;
 }
 
-/** Topbar button: shows the current choice and opens Light / Dark / System. */
-export function ThemeToggle({ className }: { className?: string }) {
-  const { preference, setPreference } = useAdminTheme();
-  // A neutral icon until mounted, so the server-rendered markup never disagrees.
-  const Current = THEME_OPTIONS.find((option) => option.value === preference)?.icon ?? Monitor;
+/**
+ * Topbar appearance switch: a sun and a moon in a sliding track.
+ *
+ * One press moves between light and dark and saves that as an explicit choice.
+ * Following the system ("System") stays available in the account menu, and
+ * is what a first visit uses until someone picks.
+ *
+ * The thumb's position is drawn by CSS from `<html data-admin-theme>`, which
+ * the inline script sets before the first paint, so the switch shows the right
+ * side immediately — there is no client-only state for hydration to correct.
+ */
+export function ThemeSwitch({ className }: { className?: string }) {
+  const { applied, preference, setPreference } = useAdminTheme();
+  const dark = applied === 'dark';
+  const following = preference === 'system';
 
   return (
-    <Menu
-      align="right"
-      width="w-44"
-      label="Theme"
-      triggerClassName="admin-focus admin-focus-header rounded-xl"
-      trigger={
-        <span
-          title="Theme"
-          className={
-            'flex h-9 w-9 items-center justify-center rounded-xl text-admin-nav/70 transition-colors hover:bg-admin-nav/[0.06] hover:text-admin-nav ' +
-            (className ?? '')
-          }
-        >
-          <Current className="h-[1.1rem] w-[1.1rem]" aria-hidden="true" />
-        </span>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={dark}
+      aria-label="Dark appearance"
+      title={
+        `${dark ? 'Switch to light appearance' : 'Switch to dark appearance'}` +
+        (following ? ' (currently following the system)' : '')
+      }
+      onClick={() => setPreference(dark ? 'light' : 'dark')}
+      className={
+        'theme-switch admin-focus relative inline-flex h-8 w-[3.75rem] shrink-0 items-center rounded-full ' +
+        (className ?? '')
       }
     >
-      <ThemeMenuItems preference={preference} onSelect={setPreference} />
-    </Menu>
+      <span
+        aria-hidden="true"
+        className="theme-switch-icon theme-switch-sun absolute left-[0.4rem]"
+      >
+        <Sun className="h-[0.95rem] w-[0.95rem]" />
+      </span>
+      <span
+        aria-hidden="true"
+        className="theme-switch-icon theme-switch-moon absolute right-[0.4rem]"
+      >
+        <Moon className="h-[0.95rem] w-[0.95rem]" />
+      </span>
+      <span
+        aria-hidden="true"
+        className="theme-switch-thumb absolute left-[3px] flex h-[1.625rem] w-[1.625rem] items-center justify-center rounded-full"
+      >
+        <Sun className="theme-switch-thumb-sun h-[0.95rem] w-[0.95rem]" />
+        <Moon className="theme-switch-thumb-moon h-[0.95rem] w-[0.95rem]" />
+      </span>
+    </button>
   );
 }
 

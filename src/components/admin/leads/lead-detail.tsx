@@ -22,6 +22,9 @@ import { Spinner } from '@/components/ui/icons';
 import { PIPELINE_STAGES, LEAD_STATUS_LABELS, LEAD_STATUS_OPTIONS } from '@/lib/crm/constants';
 import { formatDate, formatRelative, initials } from '@/lib/utils/format';
 import { cn } from '@/lib/utils/cn';
+import { DateTimeField } from '@/components/ui/date-field';
+import type { CalendarEvent } from '@/components/ui/calendar';
+import { formatTime, parseLocalDateTime } from '@/lib/ui/calendar-date';
 
 export type LeadDetailData = {
   id: string;
@@ -84,10 +87,13 @@ export function LeadDetail({
   can,
   submission,
   consent,
+  followUps = [],
 }: {
   lead: LeadDetailData;
   staff: Array<{ id: string; name: string }>;
   products: Array<{ id: string; name: string }>;
+  /** Other leads' scheduled follow-ups in this market, for the calendar's list. */
+  followUps?: Array<{ id: string; name: string; at: string }>;
   can: { edit: boolean; assign: boolean; delete: boolean; createCustomer: boolean };
   /** Every configured field as it was submitted, custom ones included. */
   submission?: SubmissionView | null;
@@ -97,6 +103,26 @@ export function LeadDetail({
   const router = useRouter();
   const { toast } = useToast();
   const [busy, setBusy] = React.useState(false);
+
+  // Read the same way the field reads this lead's own follow-up (the first 16
+  // characters of the stored timestamp), so a dot sits on the day the field shows.
+  const followUpEvents = React.useMemo<CalendarEvent[]>(
+    () =>
+      followUps.flatMap((item) => {
+        const parsed = parseLocalDateTime(item.at.slice(0, 16));
+        return parsed
+          ? [
+              {
+                id: item.id,
+                day: parsed.day,
+                title: item.name,
+                detail: `${formatTime(parsed.time)} · Follow-up`,
+              },
+            ]
+          : [];
+      }),
+    [followUps],
+  );
   const [note, setNote] = React.useState('');
   const [lostReason, setLostReason] = React.useState(lead.lostReason ?? '');
   const [confirmDelete, setConfirmDelete] = React.useState(false);
@@ -194,7 +220,14 @@ export function LeadDetail({
           </Card>
         ) : null}
 
-        <LeadEditor lead={lead} staff={staff} products={products} can={can} onSaved={() => router.refresh()} />
+        <LeadEditor
+          lead={lead}
+          staff={staff}
+          products={products}
+          can={can}
+          followUpEvents={followUpEvents}
+          onSaved={() => router.refresh()}
+        />
 
         <Card>
           <CardHeader title="Notes" description="Internal only — never shown to the lead." />
@@ -439,12 +472,14 @@ function LeadEditor({
   staff,
   products,
   can,
+  followUpEvents,
   onSaved,
 }: {
   lead: LeadDetailData;
   staff: Array<{ id: string; name: string }>;
   products: Array<{ id: string; name: string }>;
   can: { edit: boolean; assign: boolean };
+  followUpEvents: CalendarEvent[];
   onSaved: () => void;
 }) {
   const { toast } = useToast();
@@ -592,11 +627,15 @@ function LeadEditor({
                 />
               </Field>
               <Field label="Follow up" htmlFor="lead-followup" error={errors.followUpAt}>
-                <Input
+                <DateTimeField
                   id="lead-followup"
-                  type="datetime-local"
+                  label="Follow up"
+                  events={followUpEvents}
                   value={values.followUpAt}
-                  onChange={(e) => set('followUpAt', e.target.value)}
+                  invalid={!!errors.followUpAt}
+                  // Parsed on the server, so the browser's zone is not the one applied.
+                  showTimeZone={false}
+                  onChange={(next) => set('followUpAt', next)}
                 />
               </Field>
               <Field label="Source" htmlFor="lead-source">

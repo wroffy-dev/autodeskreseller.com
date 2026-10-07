@@ -14,6 +14,7 @@ import type { FieldValues } from './field-renderer';
 import { SectionListPanel } from './section-list-panel';
 import { SectionEditorPanel } from './section-editor-panel';
 import { AddSectionDialog } from './add-section-dialog';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 
 /**
  * The builder workspace, independent of what it is building.
@@ -200,30 +201,26 @@ export function SectionWorkspace({
   return (
     <>
       {/* Pane switcher — small screens only. */}
-      <div className="mb-3 grid grid-cols-2 gap-1 rounded-lg bg-muted/[0.06] p-1 lg:hidden">
-        {(
-          [
-            ['sections', listLabel ?? 'Sections', Layers],
-            ['editor', 'Edit', Settings2],
-          ] as const
-        ).map(([pane, label, Icon]) => (
-          <button
-            key={pane}
-            type="button"
-            onClick={() => setMobilePane(pane)}
-            aria-pressed={mobilePane === pane}
-            className={cn(
-              'flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
-              mobilePane === pane
-                ? 'bg-surface text-content shadow-sm'
-                : 'text-muted hover:text-content',
-            )}
-          >
-            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-            {label}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        semantics="tabs"
+        label="Workspace pane"
+        fullWidth
+        className="mb-3 lg:hidden"
+        value={mobilePane}
+        onChange={setMobilePane}
+        options={[
+          {
+            value: 'sections',
+            label: listLabel ?? 'Sections',
+            icon: <Layers className="h-3.5 w-3.5" aria-hidden="true" />,
+          },
+          {
+            value: 'editor',
+            label: 'Edit',
+            icon: <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />,
+          },
+        ]}
+      />
 
       <div
         className={cn(

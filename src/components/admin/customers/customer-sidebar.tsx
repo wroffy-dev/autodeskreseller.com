@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/toast';
 import { useRouter } from 'next/navigation';
 import { formatDate } from '@/lib/utils/format';
 import { formatMoney } from '@/lib/utils/money';
+import { DateField } from '@/components/ui/date-field';
 
 export type LinkedProduct = {
   productId: string;
@@ -122,11 +123,11 @@ export function CustomerSidebar({
                   />
                 </Field>
                 <Field label="Renews on" htmlFor="link-renews">
-                  <Input
+                  <DateField
                     id="link-renews"
-                    type="date"
+                    label="Renews on"
                     value={newProduct.renewsAt}
-                    onChange={(e) => setNewProduct({ ...newProduct, renewsAt: e.target.value })}
+                    onChange={(next) => setNewProduct({ ...newProduct, renewsAt: next })}
                   />
                 </Field>
               </div>

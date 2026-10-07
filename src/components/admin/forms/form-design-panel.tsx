@@ -15,7 +15,7 @@ import {
   type Typography,
 } from '@/lib/forms/form-design';
 import { FORM_BUTTON_ICONS, FORM_BUTTON_ICON_LABELS } from '@/components/forms/form-button-icon';
-import { cn } from '@/lib/utils/cn';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 
 /**
  * The Design tab.
@@ -1016,29 +1016,16 @@ function BreakpointSwitch({
 }) {
   return (
     <div className="sticky top-16 z-sticky -mx-1 mb-1 bg-surface/95 px-1 py-2 backdrop-blur">
-      <div
-        role="tablist"
-        aria-label="Breakpoint"
-        className="flex items-center gap-1 rounded-lg border border-hairline p-1"
-      >
-        {(Object.keys(BREAKPOINT_LABELS) as Breakpoint[]).map((key) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={key === value}
-            onClick={() => onChange(key)}
-            className={cn(
-              'flex-1 rounded px-3 py-1.5 text-sm transition-colors',
-              key === value
-                ? 'bg-brand/10 font-medium text-brand'
-                : 'text-muted hover:text-content',
-            )}
-          >
-            {BREAKPOINT_LABELS[key]}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        label="Breakpoint"
+        fullWidth
+        value={value}
+        onChange={onChange}
+        options={(Object.keys(BREAKPOINT_LABELS) as Breakpoint[]).map((key) => ({
+          value: key,
+          label: BREAKPOINT_LABELS[key],
+        }))}
+      />
       <p className="mt-1.5 px-1 text-xs text-muted">
         {value === 'desktop'
           ? 'Values set here apply everywhere unless a smaller screen overrides them.'

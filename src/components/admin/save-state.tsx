@@ -2,6 +2,7 @@
 
 import { Check, CircleAlert, Loader2, Dot } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { useUnsavedChanges } from '@/lib/admin/unsaved-changes';
 
 export type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 
@@ -20,6 +21,9 @@ export function SaveStateIndicator({
   errorMessage?: string;
   className?: string;
 }) {
+  // Lets the topbar search ask before leaving a screen with unsaved work.
+  useUnsavedChanges(state === 'dirty');
+
   if (state === 'idle') return null;
 
   const config = {

@@ -15,7 +15,8 @@ import { usePageEditorTabs } from '@/components/admin/pages/page-editor-tabs';
 import { useToast } from '@/components/ui/toast';
 import { Spinner } from '@/components/ui/icons';
 import { pageSlug } from '@/lib/utils/slug';
-import { cn } from '@/lib/utils/cn';
+import { SegmentedControl } from '@/components/ui/segmented-control';
+import { DateTimeField } from '@/components/ui/date-field';
 
 export type PageFormValues = {
   id?: string;
@@ -196,26 +197,26 @@ export function PageForm({
   return (
     <form onSubmit={onSubmit}>
       <Card>
-        <div className="flex items-center gap-1 border-b border-hairline px-3 py-2">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              aria-pressed={tab === t.id}
-              className={cn(
-                'rounded-lg px-3 py-1.5 text-sm transition-colors',
-                tab === t.id
-                  ? 'bg-brand/10 font-medium text-brand'
-                  : 'text-muted hover:text-content',
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="border-b border-hairline px-3 pt-1">
+          <SegmentedControl
+            semantics="tabs"
+            variant="underline"
+            label="Page settings sections"
+            idPrefix="page-tab-"
+            panelId={() => 'page-settings-panel'}
+            className="border-b-0"
+            value={tab}
+            onChange={setTab}
+            options={tabs.map((t) => ({ value: t.id, label: t.label }))}
+          />
         </div>
 
-        <CardBody className="space-y-4">
+        <CardBody
+          className="space-y-4"
+          id="page-settings-panel"
+          role="tabpanel"
+          aria-labelledby={`page-tab-${tab}`}
+        >
           {tab === 'general' ? (
             <>
               <Field label="Page title" htmlFor="title" required error={errors.title}>
@@ -296,11 +297,12 @@ export function PageForm({
                   error={errors.publishedAt}
                   required={values.status === 'SCHEDULED'}
                 >
-                  <Input
+                  <DateTimeField
                     id="publishedAt"
-                    type="datetime-local"
+                    label={values.status === 'SCHEDULED' ? 'Publish at' : 'Published date'}
                     value={values.publishedAt}
-                    onChange={(e) => set('publishedAt', e.target.value)}
+                    invalid={!!errors.publishedAt}
+                    onChange={(next) => set('publishedAt', next)}
                   />
                 </Field>
               </div>

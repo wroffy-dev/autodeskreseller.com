@@ -190,7 +190,12 @@ export function ProductOrderList({
             dragging is disabled while a filter is applied.
           </p>
         ) : null}
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <DndContext
+          id="product-order"
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={onDragEnd}
+        >
           <SortableContext items={visible.map((p) => p.id)} strategy={verticalListSortingStrategy}>
             <ol className="space-y-2">
               {visible.length === 0 ? (

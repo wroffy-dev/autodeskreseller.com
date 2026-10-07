@@ -8,6 +8,40 @@ This project uses [semantic versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- **Admin interface upgrade.** Shared design tokens for glass, controls, focus,
+  semantic states, type, spacing and motion; milky light and smoked dark glass
+  on navigation and overlays only, with opaque fallbacks under
+  `prefers-reduced-transparency` and where `backdrop-filter` is unsupported.
+  See [docs/ADMIN-DESIGN-SYSTEM.md](docs/ADMIN-DESIGN-SYSTEM.md).
+- **Topbar search** is now a field with a results panel anchored beneath it
+  (a full-screen sheet on phones): ⌘K / Ctrl+K, arrow keys, Enter and Escape,
+  loading/empty/error states, results grouped by module, and a prompt before
+  leaving a screen with unsaved edits. Cities are now searchable.
+- **Sun/moon theme switch** in the topbar; "System" remains in the account
+  menu. A switch cross-fades once instead of animating every element.
+- **Custom date picker** on every admin date and date-time field, with typed
+  `DD/MM/YYYY` entry, full keyboard navigation, month/year chooser, min/max,
+  clearing, and a phone sheet. Reports, the CRM dashboard and list filters
+  use a range calendar. Values posted are unchanged.
+- **Segmented controls** (sliding thumb) for short exclusive choices, and the
+  edit-screen tab strips, with radio or tab semantics as appropriate.
+- **Switch** gains pending and error states and a larger touch target; the
+  popup list's on/off now saves on flip and restores the stored state if the
+  save fails.
+
+### Fixed
+
+- Topbar search returned leads and forms from markets a restricted user cannot
+  work in. Search is now market-scoped for leads, pages, cities, posts and forms.
+- The reports range presets built their days with `toISOString()`, which
+  shifted them by a day for users far from UTC.
+- A hydration mismatch on Products → Featured & Ordering (drag-and-drop ids).
+- The form builder's field rows overflowed the page at phone widths.
+
 ## [1.2.0] — 2026-10-07
 
 ### Added
