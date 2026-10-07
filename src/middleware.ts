@@ -3,6 +3,7 @@ import NextAuth from 'next-auth';
 import { authConfig } from '@/lib/auth/config';
 import { LOGIN_PATH } from '@/lib/auth/routes';
 import { decideAttribution, parseTouch, touchFromVisit, UTM_KEYS } from '@/lib/analytics/touch';
+import { canonicalHostRedirect, requestHostFrom } from '@/lib/seo/site-address';
 
 const { auth } = NextAuth(authConfig);
 
@@ -32,12 +33,20 @@ const THIRTY_DAYS = 60 * 60 * 24 * 30;
  * check that can only be made in one of the two places must not be the one
  * users rely on.
  *
- * Database-backed redirects are handled in the catch-all route (Node runtime),
- * so they never add a query to every request.
+ *  3. Send a request on the site's other spelling (bare domain ↔ www) to the
+ *     canonical host, from the environment alone.
+ *
+ * Database-backed redirects are resolved by the public routes (Node runtime)
+ * through the URL registry, before anything renders — so they never add a
+ * query to admin, API, auth or asset requests.
  */
 export default auth((request) => {
   const { nextUrl } = request;
   const isLoggedIn = Boolean(request.auth?.user);
+
+  // The site's other spelling (bare domain ↔ www) goes to the canonical one.
+  const canonical = canonicalRedirect(request);
+  if (canonical) return NextResponse.redirect(canonical, 308);
 
   // A signed-in visitor at the sign-in screen goes to /admin, which redirects
   // onward to whichever step they still owe.
@@ -54,6 +63,34 @@ export default auth((request) => {
   captureAttribution(request, response);
   return response;
 });
+
+/**
+ * The canonical-host redirect, or null. Reads only the environment and the
+ * request headers — never the database — so it costs nothing on requests it
+ * does not apply to. `CANONICAL_HOST_REDIRECT=false` switches it off.
+ */
+function canonicalRedirect(request: NextRequest): string | null {
+  if (/^(0|false|no|off)$/i.test(runtimeEnv('CANONICAL_HOST_REDIRECT') ?? '')) return null;
+  const site = runtimeEnv('NEXT_PUBLIC_SITE_URL') || runtimeEnv('NEXTAUTH_URL');
+  if (!site) return null;
+  const { pathname, search } = request.nextUrl;
+  // Health probes answer on whatever host they are sent to.
+  if (pathname === '/api/health' || pathname === '/api/ready') return null;
+  const host = requestHostFrom(request.headers.get('x-forwarded-host'), request.headers.get('host'));
+  return canonicalHostRedirect(site, host, `${pathname}${search}`);
+}
+
+/**
+ * An environment variable as the running server has it.
+ *
+ * The build inlines `process.env.NEXT_PUBLIC_*` wherever it can see the name,
+ * so an image built before its domain was known would redirect to — or
+ * silently ignore — the wrong host for ever. Looking the name up through a
+ * variable keeps it a request-time read.
+ */
+function runtimeEnv(name: string): string | undefined {
+  return process.env[name];
+}
 
 function captureAttribution(request: NextRequest, response: NextResponse) {
   const { nextUrl } = request;

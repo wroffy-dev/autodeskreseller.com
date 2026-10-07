@@ -2,6 +2,7 @@ import 'server-only';
 import { cache } from 'react';
 import { prisma } from '@/lib/db/prisma';
 import { navHref, resolvedHref } from '@/lib/cms/nav-links';
+import { getUrlSnapshot } from '@/lib/urls/load';
 import type { CountryContext } from '@/lib/country/types';
 import type { NavigationLocation } from '@prisma/client';
 
@@ -45,15 +46,18 @@ export type ResolvedNavigation = {
 
 const navInclude = {
   image: { select: { url: true, altText: true } },
-  page: { select: { slug: true, deletedAt: true } },
-  product: { select: { slug: true, deletedAt: true } },
-  blogPost: { select: { slug: true, deletedAt: true } },
-  blogCategory: { select: { slug: true } },
+  page: { select: { id: true, slug: true, deletedAt: true } },
+  product: { select: { id: true, slug: true, deletedAt: true } },
+  blogPost: { select: { id: true, slug: true, deletedAt: true } },
+  blogCategory: { select: { id: true, slug: true } },
 };
 
 /** Loads every menu in a location for one market, with items resolved to real hrefs. */
 export const getNavigations = cache(
   async (country: CountryContext, location: NavigationLocation): Promise<ResolvedNavigation[]> => {
+    // Menu links resolve through the URL registry; make sure this request
+    // reads the current snapshot before any href is built.
+    await getUrlSnapshot();
     const menus = await prisma.navigation.findMany({
       where: { location, countryId: country.id },
       orderBy: { createdAt: 'asc' },

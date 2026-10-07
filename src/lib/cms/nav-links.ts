@@ -1,4 +1,5 @@
-import { countryPath, countryHref } from '@/lib/country/routing';
+import { countryHref } from '@/lib/country/routing';
+import { blogCategoryHref, pageHref, postHref, productHref } from '@/lib/urls/links';
 import type { CountryContext } from '@/lib/country/types';
 import type { NavLinkType } from '@prisma/client';
 
@@ -20,13 +21,19 @@ import type { NavLinkType } from '@prisma/client';
 export type LinkableItem = {
   linkType: NavLinkType;
   url: string | null;
-  page: { slug: string; deletedAt: Date | null } | null;
-  product: { slug: string; deletedAt: Date | null } | null;
-  blogPost: { slug: string; deletedAt: Date | null } | null;
-  blogCategory: { slug: string } | null;
+  page: { id: string; slug: string; deletedAt: Date | null } | null;
+  product: { id: string; slug: string; deletedAt: Date | null } | null;
+  blogPost: { id: string; slug: string; deletedAt: Date | null } | null;
+  blogCategory: { id: string; slug: string } | null;
 };
 
-/** Null when there is nothing live to link to. */
+/**
+ * Null when there is nothing live to link to.
+ *
+ * Linked items resolve through the URL registry by the target's id, so a menu
+ * keeps pointing at a page, product or article whatever its address becomes.
+ * The blog is root-only, so its links are the root address in every market.
+ */
 export function navHref(item: LinkableItem, country: CountryContext): string | null {
   const live = <T extends { deletedAt: Date | null }>(row: T | null): T | null =>
     row && row.deletedAt === null ? row : null;
@@ -34,20 +41,18 @@ export function navHref(item: LinkableItem, country: CountryContext): string | n
   switch (item.linkType) {
     case 'PAGE': {
       const page = live(item.page);
-      return page ? countryPath(country, page.slug) : null;
+      return page ? pageHref(country, page) : null;
     }
     case 'PRODUCT': {
       const product = live(item.product);
-      return product ? countryPath(country, `products/${product.slug}`) : null;
+      return product ? productHref(country, product) : null;
     }
     case 'BLOG_POST': {
       const post = live(item.blogPost);
-      return post ? countryPath(country, `blog/${post.slug}`) : null;
+      return post ? postHref(post) : null;
     }
     case 'BLOG_CATEGORY':
-      return item.blogCategory
-        ? countryPath(country, `blog/category/${item.blogCategory.slug}`)
-        : null;
+      return item.blogCategory ? blogCategoryHref(item.blogCategory) : null;
     default:
       return item.url ? countryHref(country, item.url) : null;
   }

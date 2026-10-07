@@ -3,12 +3,16 @@ import { prisma } from '@/lib/db/prisma';
 import { requirePermission } from '@/lib/auth/guards';
 import { AdminPageHeader } from '@/components/admin/page-header';
 import { ProductForm, EMPTY_PRODUCT } from '@/components/admin/products/product-form';
+import { getAdminCountryScope } from '@/lib/country/admin';
+import { effectivePattern, patternHint } from '@/lib/urls/hints';
 
 export const metadata: Metadata = { title: 'New product' };
 export const dynamic = 'force-dynamic';
 
 export default async function NewProduct() {
   await requirePermission('products.create');
+  const scope = await getAdminCountryScope();
+  const urlHint = patternHint(await effectivePattern('PRODUCT', scope.country.id), scope.country.slug);
 
   const [categories, brands, forms] = await Promise.all([
     prisma.productCategory.findMany({
@@ -37,6 +41,7 @@ export default async function NewProduct() {
         brands={brands}
         formIdBySlug={Object.fromEntries(forms.map((f) => [f.slug, f.id]))}
         mode="create"
+        urlHint={urlHint}
       />
     </div>
   );

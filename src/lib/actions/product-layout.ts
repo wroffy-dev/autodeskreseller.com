@@ -2,8 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { addressesOf, revalidateAddresses } from '@/lib/urls/revalidate';
 import { ProductSurface } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
+import { refreshSeoScores } from '@/lib/seo/intelligence/refresh';
 import { authorize } from '@/lib/auth/guards';
 import { recordAudit } from '@/lib/services/audit';
 import { blockDefaults, getBlock, blockAllowedOnSurface } from '@/lib/cms/blocks';
@@ -42,10 +44,17 @@ async function revalidateProduct(productId: string, slug?: string) {
   revalidatePath(`/admin/products/${productId}/layout`);
   revalidatePath('/admin/products/design');
   if (slug) {
-    // Every market's copy of this product page, not just the root market's.
+    // Every market's copy of this product page, at whatever address the URL
+    // registry has it — not just the root market's `/products/<slug>`.
     revalidatePath(`/products/${slug}`);
-    revalidatePath(`/[country]/products/${slug}`, 'page');
+    revalidateAddresses(await addressesOf(productId));
   }
+  // The layout is part of what every market's product page shows and is scored on.
+  refreshSeoScores(async () =>
+    (
+      await prisma.productCountry.findMany({ where: { productId, deletedAt: null }, select: { countryId: true } })
+    ).map((row) => ({ type: 'PRODUCT_MARKET' as const, id: productId, countryId: row.countryId })),
+  );
 }
 
 async function loadSection(sectionId: string) {

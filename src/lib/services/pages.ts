@@ -5,6 +5,25 @@ import type { Page, PageSection } from '@prisma/client';
 
 export type PageWithSections = Page & { sections: PageSection[] };
 
+/*
+ * A page in a city is also subject to its city. The conditions sit under
+ * `AND`, so a caller that adds its own `OR` cannot drop them by accident.
+ */
+
+/** Served: outside any city, or in an active one. An inactive city's pages answer 404. */
+const CITY_SERVED = { OR: [{ cityId: null }, { city: { isActive: true } }] };
+
+/** Indexable: an active city that does not ask search engines to stay away. */
+const CITY_INDEXABLE = { OR: [{ cityId: null }, { city: { isActive: true, noIndex: false } }] };
+
+/** Listed in sitemaps: an active, published city that is neither noindexed nor excluded. */
+const CITY_LISTED = {
+  OR: [
+    { cityId: null },
+    { city: { isActive: true, isPublished: true, noIndex: false, excludeFromSitemap: false } },
+  ],
+};
+
 /**
  * Only content that is genuinely live is ever returned to a public request.
  *
@@ -17,7 +36,22 @@ export function publishedPageWhere() {
     deletedAt: null,
     status: 'PUBLISHED' as const,
     OR: [{ publishedAt: null }, { publishedAt: { lte: new Date() } }],
+    AND: [CITY_SERVED],
   };
+}
+
+/** Live and open to search engines: what hreflang may point at. */
+export function indexablePageWhere() {
+  return { ...publishedPageWhere(), noIndex: false, AND: [CITY_INDEXABLE] };
+}
+
+/**
+ * Live, indexable and meant for the sitemap. A market's own publication and
+ * sitemap switches are applied by the sitemap per market; a city's are here,
+ * because they are per page.
+ */
+export function listedPageWhere() {
+  return { ...publishedPageWhere(), noIndex: false, AND: [CITY_LISTED] };
 }
 
 /**
@@ -31,6 +65,21 @@ export const getPublishedPage = cache(
   async (countryId: string, slug: string): Promise<PageWithSections | null> => {
     return prisma.page.findFirst({
       where: { ...publishedPageWhere(), countryId, slug },
+      include: { sections: { orderBy: { sortOrder: 'asc' } } },
+    });
+  },
+);
+
+/**
+ * A published page by its stable id, in the market it belongs to.
+ *
+ * What the URL registry resolves to: an address names a page by id, so the
+ * page is found the same way whatever its slug is today.
+ */
+export const getPublishedPageById = cache(
+  async (countryId: string, id: string): Promise<PageWithSections | null> => {
+    return prisma.page.findFirst({
+      where: { ...publishedPageWhere(), countryId, id },
       include: { sections: { orderBy: { sortOrder: 'asc' } } },
     });
   },
@@ -53,7 +102,7 @@ export const getPageForPreview = cache(async (id: string): Promise<PageWithSecti
 export const findPublishedPageCountries = cache(
   async (slug: string): Promise<string[]> => {
     const rows = await prisma.page.findMany({
-      where: { ...publishedPageWhere(), slug, noIndex: false },
+      where: { ...indexablePageWhere(), slug },
       select: { countryId: true },
     });
     return rows.map((row) => row.countryId);

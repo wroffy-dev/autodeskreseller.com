@@ -13,6 +13,7 @@ export function failure(error: string, fieldErrors?: Record<string, string[]>): 
 
 import { z } from 'zod';
 import { AuthorizationError } from '@/lib/auth/guards';
+import { UrlRegistryError } from '@/lib/urls/errors';
 
 /** Maps thrown errors to a safe, user-facing ActionResult. Never leaks stacks. */
 export function toActionError(error: unknown): ActionResult<never> {
@@ -27,7 +28,18 @@ export function toActionError(error: unknown): ActionResult<never> {
   if (error instanceof AuthorizationError) {
     return failure('You do not have permission to perform this action.');
   }
+  // A URL the registry refused: the whole save rolled back, and the form
+  // shows why beside the field that caused it.
+  if (error instanceof UrlRegistryError) {
+    return failure(error.message, { [error.field]: [error.message] });
+  }
   if (error instanceof Error) {
+    // Two saves raced for one address and the database refused the second.
+    if (error.message.includes('Unique constraint') && error.message.includes('pathKey')) {
+      return failure('That address was just taken by another change. Choose another.', {
+        slug: ['That address was just taken by another change.'],
+      });
+    }
     // Prisma unique-constraint violations are actionable for the user.
     if (error.message.includes('Unique constraint')) {
       return failure('That value is already in use. Please choose another.');

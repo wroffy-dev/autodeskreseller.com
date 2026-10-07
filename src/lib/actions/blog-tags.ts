@@ -10,6 +10,8 @@ import { uniqueSlug, slugify } from '@/lib/utils/slug';
 import { sanitizeText } from '@/lib/utils/sanitize';
 import { success, failure, toActionError, type ActionResult } from '@/lib/utils/result';
 import { revalidateAllCountryBlogs } from '@/lib/country/revalidate';
+import { getDefaultCountry } from '@/lib/country/registry';
+import { captureBefore, releaseRoutes, syncRoutes } from '@/lib/urls/content-sync';
 
 /**
  * Manual tag management.
@@ -39,7 +41,14 @@ export async function saveBlogTag(
       noIndex: formData.get('noIndex') === 'true',
     });
 
-    let slug = input.slug || slugify(input.name);
+    // On edit the address follows the slug field, never the name: a blank slug
+    // keeps the tag where it is.
+    const typedSlug = String(formData.get('slug') ?? '').trim();
+    const current = tagId
+      ? await prisma.blogTag.findUnique({ where: { id: tagId }, select: { slug: true } })
+      : null;
+    if (tagId && !current) return failure('That tag no longer exists.');
+    let slug = tagId && !typedSlug ? current!.slug : input.slug || slugify(input.name);
     if (!slug) return failure('That name cannot be turned into a URL slug.');
 
     if (tagId === null) {
@@ -71,9 +80,28 @@ export async function saveBlogTag(
       noIndex: input.noIndex,
     };
 
-    const tag = tagId
-      ? await prisma.blogTag.update({ where: { id: tagId }, data })
-      : await prisma.blogTag.create({ data });
+    // The tag, its archive's address and the redirect from its old one are
+    // saved together; a taken address fails the whole save.
+    const root = await getDefaultCountry();
+    const tag = await prisma.$transaction(async (tx) => {
+      if (!tagId) {
+        const created = await tx.blogTag.create({ data });
+        await syncRoutes(tx, [{ type: 'BLOG_TAG', entityId: created.id, countryId: root.id }], {
+          actor: user,
+          reason: 'CREATE',
+        });
+        return created;
+      }
+      const ref = { type: 'BLOG_TAG' as const, entityId: tagId, countryId: root.id };
+      const snapshot = await captureBefore(tx, [ref]);
+      const saved = await tx.blogTag.update({ where: { id: tagId }, data });
+      await syncRoutes(tx, [ref], {
+        actor: user,
+        reason: slug !== current?.slug ? 'SLUG' : 'EDIT',
+        before: snapshot,
+      });
+      return saved;
+    });
 
     await recordAudit({
       actor: user,
@@ -105,9 +133,13 @@ export async function deleteBlogTag(tagId: string): Promise<ActionResult> {
     });
     if (!tag) return failure('That tag no longer exists.');
 
+    const root = await getDefaultCountry();
     await prisma.$transaction(async (tx) => {
       await tx.blogPostTag.deleteMany({ where: { tagId } });
       await tx.blogTag.delete({ where: { id: tagId } });
+      await releaseRoutes(tx, [{ type: 'BLOG_TAG', entityId: tagId, countryId: root.id, label: tag.name }], {
+        actor: user,
+      });
     });
 
     await recordAudit({
@@ -161,9 +193,15 @@ export async function bulkBlogTagAction(input: unknown): Promise<ActionResult> {
     }
 
     const targetIds = targets.map((tag) => tag.id);
+    const root = await getDefaultCountry();
     await prisma.$transaction(async (tx) => {
       await tx.blogPostTag.deleteMany({ where: { tagId: { in: targetIds } } });
       await tx.blogTag.deleteMany({ where: { id: { in: targetIds } } });
+      await releaseRoutes(
+        tx,
+        targets.map((tag) => ({ type: 'BLOG_TAG' as const, entityId: tag.id, countryId: root.id, label: tag.name })),
+        { actor: user },
+      );
     });
 
     await recordAudit({

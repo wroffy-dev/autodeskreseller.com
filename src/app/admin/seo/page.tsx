@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { headers } from 'next/headers';
 import { Shuffle } from 'lucide-react';
 import { requirePermission, userCan } from '@/lib/auth/guards';
 import { getSeoSettings } from '@/lib/services/settings';
@@ -8,6 +9,8 @@ import { listCountries } from '@/lib/country/registry';
 import { compileRobots, type CountryRobots } from '@/lib/seo/robots';
 import { RobotsPreview } from '@/components/admin/seo/robots-preview';
 import { siteUrl } from '@/lib/env';
+import { requestHostFrom, siteAddressMismatch } from '@/lib/seo/site-address';
+import { Alert } from '@/components/ui/states';
 import { AdminPageHeader } from '@/components/admin/page-header';
 import { SeoSettingsForm, type SeoSettingsValues } from '@/components/admin/seo/seo-settings-form';
 import { buttonClasses } from '@/components/ui/button';
@@ -18,6 +21,14 @@ export const dynamic = 'force-dynamic';
 export default async function SeoAdmin() {
   const user = await requirePermission('seo.manage');
   const seo = await getSeoSettings();
+
+  // The admin is served from the site's real address, so a site address that
+  // names another host means every canonical and sitemap URL points elsewhere.
+  const headerList = await headers();
+  const mismatch = siteAddressMismatch(
+    siteUrl(),
+    requestHostFrom(headerList.get('x-forwarded-host'), headerList.get('host')),
+  );
 
   /*
    * The preview is compiled from the same function the route handler uses, so
@@ -91,6 +102,19 @@ export default async function SeoAdmin() {
           </>
         }
       />
+      {mismatch ? (
+        <Alert tone="warning" title="The site address does not match where the site is served" className="mb-5">
+          This admin is open on <code className="font-mono text-xs">{mismatch.actual}</code>, but the
+          site address is <code className="font-mono text-xs">{mismatch.configured}</code>. Canonical
+          URLs, the sitemaps, robots.txt and social links are all built from the site address, so if
+          the site now lives at {mismatch.actual} — for example because the bare domain redirects to
+          www — they all point at an address that redirects. Set{' '}
+          <code className="font-mono text-xs">NEXT_PUBLIC_SITE_URL</code> and{' '}
+          <code className="font-mono text-xs">NEXTAUTH_URL</code> to{' '}
+          <code className="font-mono text-xs">{mismatch.suggested}</code> in the deployment and
+          redeploy.
+        </Alert>
+      ) : null}
       <SeoSettingsForm initial={initial} canEdit={userCan(user, 'seo.manage')} />
 
       <RobotsPreview

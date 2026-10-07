@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
+import { postPath } from '@/lib/cms/blog-render';
+import { getUrlSnapshot } from '@/lib/urls/load';
 import { prisma } from '@/lib/db/prisma';
 import { requirePermission, userCan } from '@/lib/auth/guards';
 import { AdminPageHeader } from '@/components/admin/page-header';
@@ -33,7 +35,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         product: { select: { id: true, name: true } },
         form: { select: { name: true } },
         country: { select: { name: true } },
-        blogPost: { select: { title: true, slug: true } },
+        blogPost: { select: { id: true, title: true, slug: true } },
         notes: { orderBy: { createdAt: 'desc' }, include: { author: { select: { name: true } } } },
         activities: {
           orderBy: { createdAt: 'desc' },
@@ -79,6 +81,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   ]);
   if (!lead) notFound();
 
+  // The article link comes from the URL registry.
+  await getUrlSnapshot();
   const data: LeadDetailData = {
     id: lead.id,
     reference: lead.reference,
@@ -104,7 +108,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     customerId: lead.customerId,
     formName: lead.form?.name ?? null,
     blogPostTitle: lead.blogPost?.title ?? null,
-    blogPostUrl: lead.blogPost ? `/blog/${lead.blogPost.slug}` : null,
+    blogPostUrl: lead.blogPost ? postPath(lead.blogPost) : null,
     landingUrl: lead.landingUrl,
     referrer: lead.referrer,
     utm: {

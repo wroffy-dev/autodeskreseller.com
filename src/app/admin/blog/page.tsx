@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { blogPath } from '@/lib/cms/blog-render';
+import { getUrlSnapshot } from '@/lib/urls/load';
 import Link from 'next/link';
 import { Plus, Tag, Layers, Palette } from 'lucide-react';
 import { prisma } from '@/lib/db/prisma';
@@ -35,6 +37,8 @@ export default async function BlogAdmin({
   }>;
 }) {
   const user = await requirePermission('blog.view');
+  // The blog's address comes from the URL registry.
+  await getUrlSnapshot();
   const params = await searchParams;
   const page = Math.max(1, Number(params.page) || 1);
 
@@ -190,8 +194,8 @@ export default async function BlogAdmin({
         title="Blog"
         description={
           country.multiCountry
-            ? `Articles published at ${country.countryId ? `/${[country.current.slug, 'blog'].filter(Boolean).join('/')}` : '/blog'}. You are working in ${country.countryId ? country.current.name : 'all countries'}.`
-            : 'Articles published at /blog. Categories and tags drive the public archive pages.'
+            ? `Articles are published once, at ${blogPath()}, for every market. You are working in ${country.countryId ? country.current.name : 'all countries'}.`
+            : `Articles published at ${blogPath()}. Categories and tags drive the public archive pages.`
         }
         crumbs={[{ label: 'Blog' }]}
         actions={

@@ -378,6 +378,18 @@ body.admin-ui {
   }
 }
 
+/* Drawers: the dialog's radius on the edge that faces the workspace — the
+   top edge as a bottom sheet on phones, the left edge as a side panel. */
+.admin-ui .ui-drawer {
+  border-radius: var(--radius-dialog) var(--radius-dialog) 0 0;
+  box-shadow: var(--shadow-lg);
+}
+@media (min-width: 640px) {
+  .admin-ui .ui-drawer {
+    border-radius: var(--radius-dialog) 0 0 var(--radius-dialog);
+  }
+}
+
 /* Toasts sit over the workspace like a menu does */
 .admin-ui .ui-toast {
   border-radius: var(--radius-card-sm);

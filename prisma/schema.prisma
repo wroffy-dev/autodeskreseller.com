@@ -312,6 +312,11 @@ model Country {
   syncMappingsAsTarget CountrySyncMapping[]     @relation("SyncTarget")
   syncRunsAsSource     CountrySyncRun[]         @relation("SyncRunSource")
   syncRunsAsTarget     CountrySyncRun[]         @relation("SyncRunTarget")
+  seoAudits            SeoAudit[]
+  urlRoutes            UrlRoute[]
+  urlPatterns          UrlPattern[]
+  cities               City[]
+  cityPageBatches      CityPageBatch[]
 
   @@index([isActive, sortOrder])
   @@index([isActive, isPublished])
@@ -695,6 +700,13 @@ model Page {
   twitterDescription String? @db.Text
   twitterImageId     String?
 
+  /// Up to three keywords this page is written for, in this market.
+  /// Internal optimisation targets for SEO Intelligence, also emitted as
+  /// <meta name="keywords">. Never treated as a ranking signal.
+  primaryKeyword1 String?
+  primaryKeyword2 String?
+  primaryKeyword3 String?
+
   createdById String?
   updatedById String?
 
@@ -702,16 +714,62 @@ model Page {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
+  /// Pages that are the same page in different markets share a group key,
+  /// so a market's equivalent is found by identity even when the two pages
+  /// have different URLs.
+  groupKey String?
+
+  /// The product category or brand this page is the landing page for, by
+  /// stable id. Product pages link here rather than to an assumed URL.
+  landingCategoryId String?
+  landingBrandId    String?
+
+  /// The city whose address space the page lives in. Set by the URL registry
+  /// whenever the page is given an address, from the first segment of its
+  /// path — `delhi/revit` in a market with a Delhi city is one of
+  /// Delhi's pages — and null for every other page, which includes every page
+  /// that existed before cities did. The migration adds a trigger that refuses
+  /// a city from another market.
+  cityId         String?
+  /// The page at the city's own address (`/delhi`): its landing page. At most
+  /// one live one per city, enforced by a partial unique index.
+  isCityHomepage Boolean @default(false)
+
+  /// Where the City Page Generator copied this page from, in which run, and
+  /// when. Provenance only: a generated page is independent from the moment it
+  /// exists — nothing is ever copied from the source again, and editing either
+  /// page never changes the other.
+  generatedFromPageId String?
+  generationBatchId   String?
+  generatedAt         DateTime?
+  /// A fingerprint of the content as the generator wrote it, so the impact
+  /// preview can say exactly whether anyone has edited the page since.
+  generatedHash       String?
+
   country         Country           @relation(fields: [countryId], references: [id], onDelete: Restrict)
   category        PageCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   ogImage         Media?            @relation("PageOgImage", fields: [ogImageId], references: [id], onDelete: SetNull)
   twitterImage    Media?            @relation("PageTwitterImage", fields: [twitterImageId], references: [id], onDelete: SetNull)
+  landingCategory ProductCategory?  @relation("CategoryLandingPage", fields: [landingCategoryId], references: [id], onDelete: SetNull)
+  landingBrand    Brand?            @relation("BrandLandingPage", fields: [landingBrandId], references: [id], onDelete: SetNull)
   sections        PageSection[]
   leads           Lead[]            @relation("LeadLandingPage")
   popups          PopupPageTarget[]
   navigationItems NavigationItem[]
+  city            City?             @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  generatedFrom   Page?             @relation("PageGeneratedFrom", fields: [generatedFromPageId], references: [id], onDelete: SetNull)
+  generatedPages  Page[]            @relation("PageGeneratedFrom")
+  generationBatch CityPageBatch?    @relation("CityPageBatchPages", fields: [generationBatchId], references: [id], onDelete: SetNull)
+  cityProduct     CityProduct?
+  cityPageBatches CityPageBatch[]   @relation("CityPageBatchSource")
 
   @@unique([countryId, slug])
+  @@unique([countryId, landingCategoryId])
+  @@unique([countryId, landingBrandId])
+  @@index([cityId])
+  @@index([generatedFromPageId])
+  @@index([generationBatchId])
+  @@index([groupKey])
   @@index([slug])
   @@index([countryId])
   @@index([countryId, status, publishedAt])
@@ -742,6 +800,142 @@ model PageSection {
 }
 
 // ---------------------------------------------------------------------------
+// LOCATIONS — CITIES
+// ---------------------------------------------------------------------------
+
+/// A city in one market: a local address space inside the market's own.
+///
+/// The market stays the market — currency, pricing, settings. A city owns the
+/// first segment of addresses in its market: Delhi in the root market owns
+/// `/delhi` and everything beneath it, Dubai in the UAE owns `/ae/dubai/...`,
+/// and the URL registry refuses anything but the city's own pages there. The
+/// pages themselves are ordinary CMS pages — the landing page at `/delhi` and
+/// a generated `/delhi/autocad` are built in the Page Builder like any
+/// other. The city holds settings and metadata, never content.
+model City {
+  id        String  @id @default(cuid())
+  countryId String
+  name      String
+  /// One URL segment, unique within the market: "delhi", "new-delhi".
+  slug      String
+  /// State, emirate or province. Optional free text; nothing requires it.
+  region    String?
+
+  /// The city's publication status, and the one switch an editor sets.
+  /// DRAFT and ARCHIVED cities answer 404 for every page in their address
+  /// space and stay out of the sitemap; only a PUBLISHED city's published
+  /// pages are public. Nothing is deleted by either.
+  status     CityStatus @default(DRAFT)
+  /// When the city was archived; null unless status is ARCHIVED.
+  archivedAt DateTime?
+
+  /// Derived from `status` and kept equal to it by a CHECK constraint
+  /// (`City_status_flags`): true only for a PUBLISHED city. Kept as columns
+  /// because every public query filters on them.
+  isActive    Boolean @default(false)
+  /// See `isActive`: true only for a PUBLISHED city.
+  isPublished Boolean @default(false)
+  sortOrder   Int     @default(0)
+
+  // Local business details. Blank falls back to the market's, then the site's.
+  salesPhone     String?
+  whatsappNumber String?
+  salesEmail     String?
+  address        String? @db.Text
+  postalCode     String?
+  /// Stored as text, like the market's own coordinates.
+  latitude       String?
+  longitude      String?
+
+  // Search defaults for the city's landing page, used where the page's own
+  // fields are blank.
+  seoTitle           String?
+  seoDescription     String? @db.Text
+  primaryKeyword1    String?
+  primaryKeyword2    String?
+  primaryKeyword3    String?
+  /// Sends noindex for every page in the city.
+  noIndex            Boolean @default(false)
+  /// Keeps every page in the city out of the sitemap without noindexing it.
+  excludeFromSitemap Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  country  Country       @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  pages    Page[]
+  products CityProduct[]
+
+  @@unique([countryId, slug])
+  @@index([countryId])
+  @@index([countryId, isActive])
+  @@index([countryId, isPublished])
+  @@index([countryId, status])
+}
+
+enum CityStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+/// An explicit city/product association: "this product has its own page in
+/// this city", by stable ids.
+///
+/// Nested addresses are never assumed to be city/product pages — `/delhi/autocad`
+/// is an ordinary page in Delhi's address space unless a row here says it is
+/// Delhi's AutoCAD page — and no combination is created, let alone published,
+/// automatically. A row is written when an editor generates or links a page
+/// for one product in one city. `pageId` is that page; it must be one of the
+/// city's pages (trigger `CityProduct_page_in_city`).
+model CityProduct {
+  id          String  @id @default(cuid())
+  cityId      String
+  productId   String
+  pageId      String? @unique
+  createdById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  city    City    @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  page    Page?   @relation(fields: [pageId], references: [id], onDelete: SetNull)
+
+  @@unique([cityId, productId])
+  @@index([productId])
+}
+
+/// One run of the City Page Generator: which page was copied into which of a
+/// market's cities, by whom, and what came of each city. History only —
+/// nothing here is read to decide what any page shows.
+model CityPageBatch {
+  id           String  @id @default(cuid())
+  countryId    String
+  /// Null once the source page has been deleted for good; its title stays.
+  sourcePageId String?
+  sourceTitle  String
+  sourceSlug   String
+  created      Int     @default(0)
+  skipped      Int     @default(0)
+  failed       Int     @default(0)
+  /// One entry per city: { cityId, city, path, outcome, pageId?, reason? }.
+  results      Json    @default("[]")
+  actorId      String?
+  actorEmail   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  country    Country @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  sourcePage Page?   @relation("CityPageBatchSource", fields: [sourcePageId], references: [id], onDelete: SetNull)
+  pages      Page[]  @relation("CityPageBatchPages")
+
+  @@index([countryId, createdAt])
+  @@index([sourcePageId])
+}
+
+// ---------------------------------------------------------------------------
 // PRODUCTS
 // ---------------------------------------------------------------------------
 
@@ -758,9 +952,10 @@ model ProductCategory {
   /// Soft delete. See `Brand.deletedAt` — same reasoning, same recycle bin.
   deletedAt DateTime?
 
-  image     Media?                   @relation("CategoryImage", fields: [imageId], references: [id], onDelete: SetNull)
-  products  Product[]
-  countries ProductCategoryCountry[]
+  image        Media?                   @relation("CategoryImage", fields: [imageId], references: [id], onDelete: SetNull)
+  products     Product[]
+  countries    ProductCategoryCountry[]
+  landingPages Page[]                   @relation("CategoryLandingPage")
 
   @@index([slug])
   @@index([deletedAt])
@@ -853,9 +1048,10 @@ model Brand {
   /// at it keep pointing at it.
   deletedAt DateTime?
 
-  logo      Media?         @relation("BrandLogo", fields: [logoId], references: [id], onDelete: SetNull)
-  products  Product[]
-  countries BrandCountry[]
+  logo         Media?         @relation("BrandLogo", fields: [logoId], references: [id], onDelete: SetNull)
+  products     Product[]
+  countries    BrandCountry[]
+  landingPages Page[]         @relation("BrandLandingPage")
 
   @@index([slug])
   @@index([sortOrder])
@@ -917,6 +1113,14 @@ model Product {
   noIndex        Boolean @default(false)
   ogImageId      String?
 
+  /// Up to three keywords the product is written for. Every market uses
+  /// them unless it sets its own on its `ProductCountry` row.
+  /// Internal optimisation targets for SEO Intelligence, also emitted as
+  /// <meta name="keywords">. Never treated as a ranking signal.
+  primaryKeyword1 String?
+  primaryKeyword2 String?
+  primaryKeyword3 String?
+
   createdById String?
   updatedById String?
 
@@ -933,6 +1137,7 @@ model Product {
   /// Per-market availability, pricing, copy and SEO. The row above stays the
   /// single global master for the product's identity and shared specification.
   countries        ProductCountry[]
+  cityProducts     CityProduct[]
   leads            Lead[]            @relation("LeadProduct")
   forms            Form[]            @relation("FormProduct")
   customerProducts CustomerProduct[]
@@ -1013,6 +1218,14 @@ model ProductCountry {
   canonicalUrl   String?
   noIndex        Boolean @default(false)
   ogImageId      String?
+
+  /// This market's own primary keywords. All three blank means the
+  /// product's shared keywords apply here.
+  /// Internal optimisation targets for SEO Intelligence, also emitted as
+  /// <meta name="keywords">. Never treated as a ranking signal.
+  primaryKeyword1 String?
+  primaryKeyword2 String?
+  primaryKeyword3 String?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -1129,6 +1342,13 @@ model BlogCategory {
   noIndex        Boolean @default(false)
   noFollow       Boolean @default(false)
 
+  /// Up to three keywords the category archive is written for.
+  /// Internal optimisation targets for SEO Intelligence, also emitted as
+  /// <meta name="keywords">. Never treated as a ranking signal.
+  primaryKeyword1 String?
+  primaryKeyword2 String?
+  primaryKeyword3 String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1205,6 +1425,9 @@ model BlogPost {
 
   seoTitle       String?
   seoDescription String? @db.Text
+  /// The single keyword articles had before primary keywords. Kept, and kept
+  /// equal to primaryKeyword1 on every save, so nothing that reads it breaks
+  /// and no article loses the keyword it was written for.
   focusKeyword   String?
   canonicalUrl   String?
   noIndex        Boolean @default(false)
@@ -1213,6 +1436,14 @@ model BlogPost {
   ogDescription  String? @db.Text
   ogImageId      String?
   twitterImageId String?
+
+  /// Up to three keywords the article is written for. The first replaces
+  /// focusKeyword, which the migration copied into it.
+  /// Internal optimisation targets for SEO Intelligence, also emitted as
+  /// <meta name="keywords">. Never treated as a ranking signal.
+  primaryKeyword1 String?
+  primaryKeyword2 String?
+  primaryKeyword3 String?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -2263,17 +2494,267 @@ model EmailTemplate {
 
 model Redirect {
   id          String       @id @default(cuid())
-  source      String       @unique
+  /// The address as written. Uniqueness of addresses is enforced by
+  /// `UrlRoute.pathKey`, which every active rule claims, not by this column:
+  /// a dormant rule written before the registry may share a spelling with a
+  /// newer one.
+  source      String
+  /// Where the redirect sends visitors when it has no content target: an
+  /// internal path or a full external URL. For a redirect with a target this is
+  /// the target's URL at the time it was written, kept for display only.
   destination String
   type        RedirectType @default(PERMANENT)
   isActive    Boolean      @default(true)
   hitCount    Int          @default(0)
   note        String?
 
+  /// MANUAL rules are written by people; AUTOMATIC ones are written by the URL
+  /// registry when a published address changes.
+  origin            RedirectOrigin  @default(MANUAL)
+  /// The market whose address space the source lives in, for permissions and
+  /// filtering. Null only on rules written before the URL registry existed.
+  countryId         String?
+  /// A market-relative rule that applies under every market prefix, which is
+  /// how rules written before the URL registry behaved. New rules apply to one
+  /// exact address.
+  allMarkets        Boolean         @default(false)
+  /// The content this redirect sends visitors to, by stable identity. When set,
+  /// the destination is always that content's current URL, so a redirect never
+  /// points at an address that has itself moved: no chains, whatever happens
+  /// to the content later.
+  targetType        UrlContentType?
+  targetEntityId    String?
+  targetCountryId   String?
+  /// The destination's own query string and fragment (`?edition=lt#pricing`),
+  /// kept when the destination is content by id: the content's current
+  /// address is looked up on every request and this is appended to it.
+  destinationSuffix String?
+  lastHitAt         DateTime?
+  createdById       String?
+  updatedById       String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  /// The public addresses this rule answers for (one, or one per market for an
+  /// every-market rule). A rule with no claim is dormant: its address is owned
+  /// by content, or it could not be imported.
+  claims UrlRoute[]
+
+  @@index([source])
   @@index([isActive])
+  @@index([origin])
+  @@index([countryId])
+  @@index([targetEntityId, targetCountryId])
+}
+
+// ---------------------------------------------------------------------------
+// URL REGISTRY
+// ---------------------------------------------------------------------------
+
+/// What a public address serves. CATEGORY_PAGE and BRAND_PAGE are CMS pages
+/// linked to a product category or brand; their entity is the page.
+enum UrlContentType {
+  PAGE
+  CATEGORY_PAGE
+  BRAND_PAGE
+  PRODUCT
+  BLOG_POST
+  BLOG_CATEGORY
+  BLOG_TAG
+  BLOG_ARCHIVE
+}
+
+enum UrlRouteKind {
+  CONTENT
+  REDIRECT
+}
+
+/// PATTERN follows the inherited URL pattern; CUSTOM is an explicit override
+/// for one piece of content in one market, which pattern changes never touch.
+enum UrlRouteMode {
+  PATTERN
+  CUSTOM
+}
+
+enum RedirectOrigin {
+  MANUAL
+  AUTOMATIC
+}
+
+enum UrlChangeReason {
+  CREATE
+  EDIT
+  SLUG
+  PATTERN
+  BULK
+  IMPORT
+  RESTORE
+  DELETE
+  BACKFILL
+  MARKET
+}
+
+enum UrlHealthStatus {
+  OPEN
+  IGNORED
+  RESOLVED
+}
+
+enum UrlOperationStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  PARTIAL
+  FAILED
+}
+
+/// The authoritative map of every public address the site answers for.
+///
+/// Each row claims one normalised path. A CONTENT row serves a piece of
+/// content in one market; a REDIRECT row is the address a redirect answers
+/// for. Because both live in one table under one unique key, no two things can
+/// ever own the same address — a page, a product, an article and a redirect
+/// source all compete for the same `pathKey`.
+model UrlRoute {
+  id        String       @id @default(cuid())
+  kind      UrlRouteKind @default(CONTENT)
+  /// The public path, market prefix included: "/", "/ae", "/autocad",
+  /// "/ae/software/autocad-lt".
+  path      String
+  /// `path` normalised for comparison: lower case, no trailing slash.
+  pathKey   String       @unique
+  /// The market whose address space the path lives in.
+  countryId String
+
+  type     UrlContentType?
+  /// The content's stable id: Page, Product, BlogPost, BlogCategory or BlogTag
+  /// id, or "blog" for the blog archive. Never a slug.
+  entityId String?
+  mode     UrlRouteMode    @default(PATTERN)
+
+  redirectId String?
+
+  /// Bumped on every change, so a stale edit screen cannot overwrite a newer
+  /// one.
+  version     Int      @default(1)
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  country  Country   @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  redirect Redirect? @relation(fields: [redirectId], references: [id], onDelete: Cascade)
+
+  @@unique([entityId, countryId])
+  @@index([countryId, kind, type])
+  @@index([redirectId])
+  @@index([type])
+}
+
+/// URL patterns: a global default per content type, optionally overridden per
+/// market. `{slug}` is replaced by the content's slug.
+model UrlPattern {
+  id          String         @id @default(cuid())
+  type        UrlContentType
+  /// Null for the global default.
+  countryId   String?
+  /// `${type}:${countryId ?? "*"}` — one pattern per type per scope.
+  scopeKey    String         @unique
+  pattern     String
+  version     Int            @default(1)
+  updatedById String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  country Country? @relation(fields: [countryId], references: [id], onDelete: Cascade)
+
+  @@index([type])
+}
+
+/// Every change to a piece of content's public address, including the ones
+/// that removed it. Kept after the content is deleted, so its old URLs can
+/// still be given a deliberate new home.
+model UrlHistory {
+  id         String          @id @default(cuid())
+  type       UrlContentType
+  entityId   String
+  countryId  String
+  /// The content's name when the change was made.
+  label      String
+  oldPath    String?
+  newPath    String?
+  reason     UrlChangeReason
+  /// The automatic redirect this change created, if any. No foreign key: the
+  /// redirect can be deleted without rewriting history.
+  redirectId String?
+  batchId    String?
+  actorId    String?
+  actorEmail String?
+  createdAt  DateTime        @default(now())
+
+  @@index([entityId, countryId, createdAt])
+  @@index([createdAt])
+  @@index([countryId])
+  @@index([batchId])
+}
+
+/// Addresses that answered 404, recorded for URL Health. One row per path,
+/// counted rather than logged per hit, and bounded in size.
+model UrlNotFound {
+  id           String          @id @default(cuid())
+  pathKey      String          @unique
+  path         String
+  countryId    String?
+  hits         Int             @default(1)
+  firstSeenAt  DateTime        @default(now())
+  lastSeenAt   DateTime        @default(now())
+  /// Referring site and path only — never a query string.
+  lastReferrer String?
+  status       UrlHealthStatus @default(OPEN)
+  redirectId   String?
+
+  @@index([status, lastSeenAt])
+  @@index([hits])
+}
+
+/// One bulk URL change, applied in batches so a large one can be followed and
+/// resumed.
+model UrlOperation {
+  id         String             @id @default(cuid())
+  kind       String
+  status     UrlOperationStatus @default(PENDING)
+  summary    String
+  total      Int
+  processed  Int                @default(0)
+  succeeded  Int                @default(0)
+  failed     Int                @default(0)
+  /// The validated items, each with the route version it was validated against.
+  plan       Json
+  results    Json?
+  actorId    String?
+  actorEmail String?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  finishedAt DateTime?
+
+  @@index([createdAt])
+}
+
+/// The registry's own state.
+model UrlSettings {
+  id              String    @id @default("singleton")
+  /// Bumped on every registry write. Link generation caches the registry and
+  /// reloads it when this changes, so an edit is live on every instance
+  /// without a rebuild.
+  version         Int       @default(1)
+  /// Whether public requests are resolved through the registry. Off until an
+  /// administrator has reviewed the first scan and switched it on.
+  resolverEnabled Boolean   @default(false)
+  activatedAt     DateTime?
+  activatedById   String?
+  lastScanAt      DateTime?
+  lastScan        Json?
+  updatedAt       DateTime  @updatedAt
 }
 
 // ---------------------------------------------------------------------------
@@ -2641,4 +3122,75 @@ model CountrySyncRun {
 
   @@index([targetCountryId, startedAt])
   @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// SEO INTELLIGENCE
+// ---------------------------------------------------------------------------
+
+/// Cached SEO Intelligence results, one row per audited URL.
+///
+/// A cache, never a source of truth: every value is calculated from the page,
+/// product, article or archive it describes, and a row is stale the moment
+/// that content, or a setting that shapes every score, changes. Deleting
+/// every row loses nothing but the time it takes to recalculate them.
+model SeoAudit {
+  id         String @id @default(cuid())
+  /// PAGE, PRODUCT_MARKET, BLOG_POST, BLOG_CATEGORY, BLOG_TAG or BLOG_ARCHIVE.
+  entityType String
+  /// The page, article, category or tag id; the product id for a market
+  /// version; "blog" for the blog archive.
+  entityId   String
+  /// The market the URL belongs to. A market version is its own row, so India
+  /// and the UAE are never scored as one page.
+  countryId  String
+
+  // What the row describes, copied here so the dashboard filters and sorts in
+  // the database rather than in memory.
+  /// homepage, page, product, article, category, tag or archive.
+  kind      String
+  title     String
+  url       String  @db.Text
+  /// live, scheduled, draft, archived or not-served.
+  status    String
+  /// Live and not noindex: what counts towards the site score.
+  indexable Boolean
+  noIndex   Boolean
+
+  seoScore     Int
+  aeoScore     Int
+  geoScore     Int
+  overallScore Int
+
+  criticalCount   Int @default(0)
+  warningCount    Int @default(0)
+  suggestionCount Int @default(0)
+  issueCount      Int @default(0)
+
+  missingMetadata  Boolean @default(false)
+  missingSchema    Boolean @default(false)
+  missingKeywords  Boolean @default(false)
+  indexingConflict Boolean @default(false)
+
+  /// Every check that did not pass, with its points, message and fix.
+  issues   Json @default("[]")
+  /// Per-keyword placement analysis.
+  keywords Json @default("[]")
+
+  engineVersion      String
+  /// When the audited content last changed, and a fingerprint that also
+  /// moves when a section is added, removed or hidden.
+  contentUpdatedAt   DateTime
+  contentFingerprint String
+  /// The settings every score depends on: templates, robots, market indexing.
+  contextFingerprint String
+  calculatedAt       DateTime @default(now())
+
+  country Country @relation(fields: [countryId], references: [id], onDelete: Cascade)
+
+  @@unique([entityType, entityId, countryId])
+  @@index([countryId, overallScore])
+  @@index([entityType, overallScore])
+  @@index([overallScore])
+  @@index([calculatedAt])
 }

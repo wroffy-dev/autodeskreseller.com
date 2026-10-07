@@ -10,7 +10,7 @@ import { sanitizeText, safeUrl } from '@/lib/utils/sanitize';
 import { success, failure, toActionError, type ActionResult } from '@/lib/utils/result';
 import { resolveActionCountry } from '@/lib/country/admin';
 import { assertCountryAccess } from '@/lib/country/access';
-import { CMS_ICON_NAMES } from '@/components/ui/icons';
+import { isCmsIconName } from '@/components/ui/icon-names';
 import { cssLength } from '@/lib/cms/chrome';
 
 const menuSchema = z.object({
@@ -204,7 +204,7 @@ export async function saveNavigationItems(input: unknown): Promise<ActionResult>
               description: item.description ? sanitizeText(item.description) : null,
               // Only a name from the shipped set is stored; anything else is
               // no icon, which is what the renderer would show anyway.
-              icon: item.icon && CMS_ICON_NAMES.includes(item.icon) ? item.icon : null,
+              icon: item.icon && isCmsIconName(item.icon) ? item.icon : null,
               imageId: item.imageId || null,
               // A length or nothing: anything else would reach the renderer as
               // a style value, and it is never worth trusting one of those.

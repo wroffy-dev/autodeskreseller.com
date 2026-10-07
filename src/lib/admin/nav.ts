@@ -114,6 +114,26 @@ export const ADMIN_NAV: AdminNavModule[] = [
     ],
   },
   {
+    id: 'locations',
+    label: 'Locations',
+    icon: 'map-pin',
+    items: [
+      {
+        label: 'Cities',
+        href: '/admin/cities',
+        permission: 'pages.view',
+        description: 'Local address spaces inside each market, such as /delhi',
+        notMatches: ['/admin/cities/generator'],
+      },
+      {
+        label: 'City Page Generator',
+        href: '/admin/cities/generator',
+        permission: 'pages.create',
+        description: 'Copy a page into many cities at once',
+      },
+    ],
+  },
+  {
     id: 'products',
     section: 'Catalogue',
     label: 'Products',
@@ -265,10 +285,17 @@ export const ADMIN_NAV: AdminNavModule[] = [
         description: 'Titles, social sharing and indexing',
       },
       {
-        label: 'Redirects',
-        href: '/admin/redirects',
+        label: 'SEO Intelligence',
+        href: '/admin/seo-intelligence',
         permission: 'seo.manage',
-        description: 'Send old URLs to new ones',
+        description: 'SEO, AEO and GEO scores for every page',
+      },
+      {
+        label: 'Slug & URL Manager',
+        href: '/admin/slug-manager',
+        permission: 'seo.manage',
+        description: 'Addresses, URL patterns, redirects and URL health',
+        alsoMatches: ['/admin/redirects'],
       },
     ],
   },

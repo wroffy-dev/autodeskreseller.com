@@ -1,6 +1,6 @@
 import type { CountryContext } from './types';
-import { LOGIN_PATH_SEGMENT } from '@/lib/auth/routes';
-import { SEED_FILES_SEGMENT } from '@/lib/seed-files/routes';
+import { RESERVED_SEGMENTS, isReservedSegment } from './reserved';
+import { currentRegisteredLink, isRootOnlyPath, urlRegistryActive } from '@/lib/urls/snapshot';
 
 /**
  * The country routing engine.
@@ -18,50 +18,7 @@ import { SEED_FILES_SEGMENT } from '@/lib/seed-files/routes';
  *     so /admin, /api and the rest cannot be captured by a market prefix.
  */
 
-/**
- * First path segments that can never be a market prefix.
- *
- * Anything the framework, the admin, authentication, uploads or a crawler owns
- * belongs here. A market whose slug collided with one of these would shadow a
- * system route, so `isReservedSegment` is also what the country form validates
- * a new slug against.
- */
-export const RESERVED_SEGMENTS: ReadonlySet<string> = new Set([
-  'admin',
-  'api',
-  '_next',
-  '_vercel',
-  'auth',
-  // The sign-in screen lives under its own segment; read from the one module
-  // that defines it so moving the screen cannot leave a stale entry here.
-  LOGIN_PATH_SEGMENT,
-  // The seed-file screen is a system route of its own, outside /admin.
-  SEED_FILES_SEGMENT,
-  'login',
-  'logout',
-  'preview',
-  'uploads',
-  'media',
-  'static',
-  'assets',
-  'favicon.ico',
-  'robots.txt',
-  'sitemap.xml',
-  // The per-market sitemap files live under /sitemaps/<prefix>.xml.
-  'sitemaps',
-  'manifest.json',
-  'health',
-  'ready',
-  'opensearch.xml',
-  'sw.js',
-]);
-
-export function isReservedSegment(segment: string): boolean {
-  const value = segment.trim().toLowerCase();
-  if (!value) return false;
-  // Any dotted first segment is a file, never a market.
-  return RESERVED_SEGMENTS.has(value) || value.includes('.');
-}
+export { RESERVED_SEGMENTS, isReservedSegment } from './reserved';
 
 /**
  * Prefixes a market may not claim.
@@ -84,7 +41,8 @@ const RESERVED_COUNTRY_PREFIXES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * The blog lives at the site root only.
+ * The blog lives at the site root only. (With the URL registry switched on,
+ * link generation asks the registry instead — the blog may have moved.)
  *
  * Articles are written once and are not per-market: there is one `/blog`, one
  * set of categories and one set of tags, and every market links to them. So a
@@ -147,14 +105,16 @@ export function countryPath(country: Pick<CountryContext, 'slug'>, path = ''): s
  * market prefix. Everything else — the root-relative links an editor types
  * into a CTA — gains the current market's prefix.
  *
- * For the default market this is the identity function, which is why the root
- * market's rendered HTML is unchanged by the multi-market conversion.
+ * With the URL registry switched on, a link to an address the registry knows
+ * is rendered at that content's current address in `country` (see below).
+ * Otherwise, for the default market this is the identity function, which is
+ * why the root market's rendered HTML is unchanged by the multi-market
+ * conversion.
  */
 export function countryHref(country: CountryContext, href: string | null | undefined): string {
   if (!href) return href ?? '';
   const value = href.trim();
   if (!value) return href;
-  if (country.isDefault || !country.slug) return href;
 
   // Not an internal path: external, anchor, query, mailto/tel, or //host.
   if (!value.startsWith('/') || value.startsWith('//')) return href;
@@ -165,15 +125,29 @@ export function countryHref(country: CountryContext, href: string | null | undef
   const first = segments[0];
 
   if (first && isReservedSegment(first)) return href;
+  // Addressed to another market on purpose — the editor meant that market.
+  if (first && first !== country.slug && country.prefixes.includes(first)) return href;
+
+  /*
+   * The URL registry knows the address: render where it is now, in this
+   * market. A link to a page that has since moved goes straight to its new
+   * address instead of through a redirect, and a root link rendered in the
+   * UAE goes to the UAE's own address for the same content, whatever that
+   * address is.
+   */
+  const registered = currentRegisteredLink(country, pathPart);
+  if (registered) return `${registered}${suffix}`;
+
+  if (country.isDefault || !country.slug) return href;
   /*
    * The blog is root-only, so a link to it stays root-relative in every
    * market. Prefixing it would produce a URL that only exists to redirect
-   * back here — and a country navigation linking to `/blog` is exactly what
+   * back here — and a country navigation linking to the blog is exactly what
    * is wanted.
    */
-  if (first === 'blog') return href;
-  // Already addressed to a market — the editor meant that market.
-  if (first && (first === country.slug || country.prefixes.includes(first))) return href;
+  if (isRootOnlyPath(pathPart)) return href;
+  // Already addressed to this market.
+  if (first && first === country.slug) return href;
 
   const localised = countryPath(country, segments.join('/'));
   return `${localised}${suffix}`;
@@ -225,11 +199,12 @@ export function contentSlug(path: string): string {
  * block component free of market logic.
  *
  * For the default market the payload is returned by reference and nothing is
- * walked at all, so the root market's rendering path is completely unchanged.
- * System routes and already-prefixed links are left alone by `countryHref`.
+ * walked at all — unless the URL registry is on, when even the root market's
+ * links are brought to their content's current address. System routes and
+ * links addressed to another market are left alone by `countryHref`.
  */
 export function localiseContent<T>(content: T, country: CountryContext): T {
-  if (country.isDefault || !country.slug) return content;
+  if ((country.isDefault || !country.slug) && !urlRegistryActive()) return content;
   return walk(content, country) as T;
 }
 
@@ -242,7 +217,7 @@ export function localiseContent<T>(content: T, country: CountryContext): T {
  * because every candidate still goes through `countryHref`.
  */
 export function localiseHtml(html: string, country: CountryContext): string {
-  if (country.isDefault || !country.slug) return html;
+  if ((country.isDefault || !country.slug) && !urlRegistryActive()) return html;
   if (!html.includes('/')) return html;
   return html.replace(
     /\b(href|src)=("|')(\/[^"']*)\2/gi,

@@ -1,6 +1,6 @@
 # Versioning
 
-**Current release:** `1.1.0` — released 2026-09-16
+**Current release:** `1.2.0` — released 2026-10-07
 
 Everything about how this application is versioned: where the number lives, how
 Settings reads it, how to move it, and what it is *not*.
@@ -125,7 +125,7 @@ after a new image is built and running:
 
 ```bash
 # 1. Build the image from the committed release
-docker build -t dropbox-reseller:1.1.0 --build-arg BUILD_COMMIT=$(git rev-parse --short=12 HEAD) .
+docker build -t dropbox-reseller:1.2.0 --build-arg BUILD_COMMIT=$(git rev-parse --short=12 HEAD) .
 
 # 2. Apply migrations (additive; it neither resets nor deletes anything)
 npx prisma migrate deploy
@@ -164,30 +164,40 @@ been published; version `0` is a real, valid version and not a draft. See
 
 ## This release
 
-**1.1.0 — 2026-09-16.** Full detail in [CHANGELOG.md](./CHANGELOG.md).
+**1.2.0 — 2026-10-07.** Full detail in [CHANGELOG.md](./CHANGELOG.md).
 
-- Public forms submit again on a site with no consent notice published — they
-  were rejecting every submission.
-- One consent tick box per form, with enquiry, marketing and Terms still
-  recorded separately from what was actually displayed.
-- Marketing wording may be left empty, and is then hidden completely.
-- Marketing can no longer be bundled into a required tick box.
-- Publishing a country notice no longer deactivates other markets' notices.
-- Admin → Settings → Application information.
+- **Slug & URL Manager** and the **URL registry**: one owner per public
+  address, custom address → country pattern → global pattern, automatic 308
+  redirects straight to content by id, conflicts, history, URL Health.
+  See [docs/URL-REGISTRY.md](./docs/URL-REGISTRY.md).
+- **Redirects → Import CSV** (`URL,Destination URL`) with whole-graph
+  validation, explicit conflict decisions and resumable batches.
+- **Cities** with Draft / Published / Archived status, bulk import, the City
+  Page Generator (drafts only, `{{city}}`/`{{country}}`/`{{region}}`, explicit
+  regeneration) and explicit city/product associations.
+  See [docs/CITIES.md](./docs/CITIES.md).
+- **SEO Intelligence**: SEO, AEO and GEO scorecards with a documented,
+  versioned rule engine. See [docs/SEO-INTELLIGENCE.md](./docs/SEO-INTELLIGENCE.md).
+- The country-isolation fixes listed under 1.2.0 in the changelog.
+
+Upgrade: deploy (migrations run on start), run the URL scan, review
+Conflicts, switch the registry on, then *Recalculate all* in SEO Intelligence.
 
 ### Verification
 
 | Check | Result |
 |---|---|
-| `npm test` | 912 passed, 61 files |
+| `npm test` | 1,358 passed, 90 files (PostgreSQL 16) |
 | `npm run typecheck` | clean |
 | `npm run lint` | clean |
-| `npm run build` | succeeded; version and build commit inlined into the output |
-| Browser — no notice published | one tick box; submits; evidence records version 0 |
-| Browser — notice published | submits; evidence records the published version |
-| Browser — box unticked | refused with its own message, inputs kept, button released, no lead |
-| Browser — marketing wording cleared | nothing rendered, no empty elements left behind |
-| Browser — marketing on a required box | dropped from display; recorded `marketingPresented = false` |
-| Browser — Settings | reads 1.1.0, the release date and the build commit; no editable control |
-| Browser — 320/375/768px | no horizontal overflow; keyboard focus and Space work |
-| Migration | additive; applied to a database with existing data, nothing rewritten |
+| `npm run build` | succeeded |
+| Migrations | applied to an empty database and to a seeded one; `migrate diff` shows only the pre-existing `CountrySettings` drift, deliberately not dropped |
+| URL scan | dry run and real run agree; a second run registers nothing; no address moves |
+| HTTP — before switching on | existing pages, products and articles 200; `/pricing/` 308 → `/pricing` |
+| HTTP — `/products/autocad` → `/autocad` → `/software/autocad` | every earlier address 308 straight to `/software/autocad`, query kept; `/ae/products/autocad` 308 → `/ae/autocad` |
+| HTTP — redirect CSV | 4 rows written, content address and loop refused; `Location` keeps `?edition=lt#pricing` |
+| HTTP — cities | published `/delhi` 200, `/delhi/` 308; draft `/gurugram`, `/ae/dubai`, draft pages 404; sitemap lists only published, indexable pages |
+| Canonical / hreflang / JSON-LD | the same registry URL in each; hreflang only for real equivalents; no keywords meta tag |
+| Browser — admin | switch on, pattern preview/apply, drawer, CSV import, city publish, generator with product and confirmed regeneration, SEO dashboard and analysis; no page errors |
+| Browser — 390px and dark theme | no horizontal overflow on any new screen |
+| `scripts/smoke.mjs` | 76/81: `/products/...` and the sitemap checks fail because the verification moved products to `/{slug}` and the sitemap is an index (both stale checks); two admin text checks (Settings, Staff) fail on screens this release does not change |

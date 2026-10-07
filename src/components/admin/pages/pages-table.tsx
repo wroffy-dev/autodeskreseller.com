@@ -20,6 +20,9 @@ export type PageRow = {
   updatedAt: string;
   /** Null when the page is uncategorised. */
   categoryName: string | null;
+  /** The city the page belongs to, if any. */
+  cityName?: string | null;
+  isCityHomepage?: boolean;
   /** The market this page belongs to. */
   countryName: string;
   countryCode: string;
@@ -142,6 +145,12 @@ export function PagesTable({
                   {row.isHomepage ? (
                     <Badge tone="brand" className="ml-2">
                       Homepage
+                    </Badge>
+                  ) : null}
+                  {row.cityName ? (
+                    <Badge tone="info" className="ml-2" title={row.isCityHomepage ? 'The city’s landing page' : 'A page in this city'}>
+                      {row.cityName}
+                      {row.isCityHomepage ? ' · landing' : ''}
                     </Badge>
                   ) : null}
                 </Td>

@@ -5,6 +5,8 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 import { requirePermission, userCan } from '@/lib/auth/guards';
 import { getAdminCountryScope } from '@/lib/country/admin';
+import { joinMarket } from '@/lib/urls/path';
+import { effectivePattern } from '@/lib/urls/hints';
 import { originalSlug } from '@/lib/utils/slug';
 import { AdminPageHeader } from '@/components/admin/page-header';
 import {
@@ -88,7 +90,11 @@ export default async function ProductTrashAdmin() {
         }
       />
 
-      <ProductTrashTable products={products} canManage={userCan(user, 'products.delete')} />
+      <ProductTrashTable
+        products={products}
+        canManage={userCan(user, 'products.delete')}
+        urlPattern={joinMarket(scope.country.slug, await effectivePattern('PRODUCT', scope.country.id))}
+      />
     </>
   );
 }

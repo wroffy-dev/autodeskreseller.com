@@ -9,6 +9,7 @@ How this platform is put together, and why. For setup and operations, see
 
 - [Shape of the system](#shape-of-the-system)
 - [Countries](#countries)
+- [Cities](#cities)
 - [Request flow](#request-flow)
 - [Directory layout](#directory-layout)
 - [Data model](#data-model)
@@ -88,6 +89,41 @@ the media library, product identity, taxonomies, staff, roles and permissions.
 
 Full reference, including the migration and how to add a market:
 [docs/MULTI-COUNTRY.md](docs/MULTI-COUNTRY.md).
+
+---
+
+## Cities
+
+Country is the market; a **City** is a local address space inside one market;
+**Page** is the content. A city owns the first segment of its market's
+addresses (`/delhi`, `/ae/dubai`), and its landing page and every other page
+in it are ordinary `Page` rows edited in the Page Builder — there is no second
+CMS, no per-city route and no second conflict system:
+
+- **Addresses** — the URL registry files a page under a city from its address
+  (`placeContent`) and refuses anything else in a city's space; a city's slug
+  is checked against the registry before it is given (`src/lib/urls/cities.ts`).
+- **Liveness** — a city's `status` (DRAFT / PUBLISHED / ARCHIVED) is the one
+  switch; `publishedPageWhere()` serves a city page only while its city is
+  published (the derived `isActive` flag, held equal to the status by a CHECK
+  constraint), and `listedPageWhere()` adds the city's noindex and sitemap
+  switches for the sitemap.
+- **Search and contact details** — resolved Page → City → Country → Global at
+  render time by `src/lib/cities/seo.ts` and `src/lib/cities/local.ts`, for the
+  public page and SEO Intelligence alike.
+- **Generator** — copies a page into many cities as drafts, one transaction
+  per city, filling `{{city}}`/`{{region}}`-style placeholders once. Generated
+  pages keep provenance (`generatedFromPageId`, `generationBatchId`,
+  `generatedAt`, `generatedHash`) and nothing ever syncs them; regenerating
+  an existing page is an explicit, confirmed choice after an impact preview.
+- **City/product pages** — an explicit `CityProduct` row (city, product,
+  page) marks a page as a city's page for a product; a nested address alone
+  never does.
+- **Database guarantees** — triggers keep a city's address space to its own
+  pages and keep its own address free of manual redirects, so the rules hold
+  whatever writes the rows.
+
+Full reference: [docs/CITIES.md](docs/CITIES.md).
 
 ---
 
@@ -468,6 +504,52 @@ disallow when the SEO screen's "hide from search engines" switch is on.
 Redirects are checked only when a request would otherwise 404 — the lookup costs
 nothing on the happy path. Saving a redirect walks the existing chain and
 refuses anything that would close a loop.
+
+### Public addresses: the URL registry
+
+Every public address is owned by exactly one thing, recorded in `UrlRoute`
+(`pathKey` unique): content by `(entityId, countryId)`, or a redirect rule.
+Content identity and public path are separate, so every link is built from the
+id (`lib/urls/links.ts`) and any address can change without breaking one.
+
+```
+request ──▶ public route (catch-all or /products, /blog/…)
+              │
+              ▼
+        resolvePublic(path)        lib/urls/resolve.ts
+              │  registry on:  one lookup of pathKey
+              │     CONTENT   → render that content by id (404 unless live)
+              │     REDIRECT  → 308/307 before rendering, query kept
+              │     none      → 404, recorded for URL Health
+              │  registry off: the previous slug-based rules, unchanged
+              ▼
+        surface renders by id
+```
+
+Addresses are decided by custom address → market pattern → global pattern →
+built-in default, and written only under one PostgreSQL advisory lock with
+optimistic versions. Each server holds the registry in memory and rebuilds it
+when `UrlSettings.version` changes, which costs one primary-key read per
+request. The registry ships switched off; switching it off again is the
+rollback. Full reference: [docs/URL-REGISTRY.md](docs/URL-REGISTRY.md).
+
+Bulk redirects come from a two-column CSV (`URL,Destination URL`), validated
+as one proposed change to the whole redirect graph — existing rules included —
+and applied in locked, resumable batches recorded on `UrlOperation`
+(`lib/urls/redirect-import.ts`).
+
+### SEO Intelligence
+
+Every public URL is scored for SEO, AEO and GEO (overall = 50/25/25) by a
+deterministic, versioned rule engine (`lib/seo/score-*.ts`) over the
+**effective public content**: block adapters (`lib/seo/content/`) turn CMS
+sections and product/blog layouts into what a visitor sees, and documents are
+built with the registry's addresses (`lib/seo/intelligence/documents.ts`).
+Results are cached in `SeoAudit` with the content's and settings'
+fingerprints (the route version included), so a stale score is detected
+without rescoring; saves refresh affected URLs after the response. AEO and GEO
+are internal content-readiness assessments, never claims about rankings or AI
+citations. Full reference: [docs/SEO-INTELLIGENCE.md](docs/SEO-INTELLIGENCE.md).
 
 ---
 

@@ -1,6 +1,10 @@
 import { headers } from "next/headers";
 import { prisma } from "@/lib/db/prisma";
-import { getPublishedPage } from "@/lib/services/pages";
+import { getPublishedPage, getPublishedPageById } from "@/lib/services/pages";
+import { getUrlSnapshot } from "@/lib/urls/load";
+import { currentUrlSnapshot } from "@/lib/urls/snapshot";
+import { pathKey } from "@/lib/urls/path";
+import { isPageType } from "@/lib/urls/types";
 import { getWebsiteSettings } from "@/lib/services/settings";
 import {
   getNavigations,
@@ -11,10 +15,12 @@ import { SiteHeader } from "@/components/public/site-header";
 import { SiteFooter } from "@/components/public/site-footer";
 import { PopupHost } from "@/components/public/popup-host";
 import { JsonLd } from "@/components/seo/json-ld";
-import { organizationSchema, websiteSchema } from "@/lib/seo/structured-data";
+import { siteJsonLd } from "@/lib/seo/page-schema";
 import { getCurrentUser } from "@/lib/auth/guards";
 import { resolveCountryPath } from "@/lib/country/registry";
 import { getCountrySettings } from "@/lib/country/settings";
+import { getActiveCityAt } from "@/lib/services/cities";
+import { withCityDetails } from "@/lib/cities/local";
 import { resolveMarketOptions } from "@/lib/country/switch";
 import { countryPath, contentSlug, countryHref } from "@/lib/country/routing";
 import type { CountryContext } from "@/lib/country/types";
@@ -36,14 +42,20 @@ export default async function PublicLayout({
    */
   const { country, path } = await resolveCountryPath(pathname);
 
-  // A CMS page can opt out of the site header or footer. Other public routes
-  // (blog, products) always show both. getPublishedPage is request-cached, so
-  // this adds no extra query for the page route itself.
-  const chrome = await resolveChrome(country, path);
+  // Every link this layout renders — menus, calls to action, the market
+  // switcher — resolves through the URL registry; load its current snapshot
+  // before any of them is built.
+  const urls = await getUrlSnapshot();
 
-  const [site, local, nav, markets, popups] = await Promise.all([
+  // A CMS page can opt out of the site header or footer. Other public routes
+  // (blog, products) always show both.
+  const chrome = await resolveChrome(country, path, urls.enabled);
+
+  const [site, marketLocal, city, nav, markets, popups] = await Promise.all([
     getWebsiteSettings(),
     getCountrySettings(country),
+    // Inside a city, its own contact details come first: city → market → site.
+    getActiveCityAt(country.id, contentSlug(path)),
     getPrimaryNavigation(country),
     resolveMarketOptions(country, path),
     prisma.popup.findMany({
@@ -66,6 +78,8 @@ export default async function PublicLayout({
       },
     }),
   ]);
+
+  const local = withCityDetails(marketLocal, city);
 
   // Maintenance mode hides the public site from visitors — a restore turns it
   // on for the duration so nobody browses a half-restored database. Signed-in
@@ -162,7 +176,7 @@ export default async function PublicLayout({
             .map((t) => t.page.slug),
         }))}
       />
-      <JsonLd data={[organizationSchema(country, local, site), websiteSchema(country, site)]} />
+      <JsonLd data={siteJsonLd(country, local, site)} />
     </>
   );
 }
@@ -171,12 +185,20 @@ export default async function PublicLayout({
 async function resolveChrome(
   country: CountryContext,
   path: string,
+  registry: boolean,
 ): Promise<{ showHeader: boolean; showFooter: boolean }> {
   const slug = contentSlug(path);
-  if (slug === "blog" || slug.startsWith("blog/") || slug.startsWith("products/")) {
-    return { showHeader: true, showFooter: true };
-  }
+  const both = { showHeader: true, showFooter: true };
   try {
+    if (registry) {
+      // The registry says what the address is; only a page has chrome flags.
+      const key = pathKey(countryPath(country, slug));
+      const route = key ? currentUrlSnapshot()?.byKey.get(key) : undefined;
+      if (!route || !isPageType(route.type)) return both;
+      const page = await getPublishedPageById(country.id, route.entityId);
+      return page ? { showHeader: page.showHeader, showFooter: page.showFooter } : both;
+    }
+    if (slug === "blog" || slug.startsWith("blog/") || slug.startsWith("products/")) return both;
     const page = await getPublishedPage(country.id, slug);
     if (!page) return { showHeader: true, showFooter: true };
     return { showHeader: page.showHeader, showFooter: page.showFooter };

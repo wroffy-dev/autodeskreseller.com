@@ -3,6 +3,18 @@
 import * as React from 'react';
 import { AdminTabs, TabPanel } from '@/components/admin/admin-tabs';
 
+type EditorTab = 'builder' | 'settings';
+
+const PageEditorTabsContext = React.createContext<{ show: (tab: EditorTab) => void } | null>(null);
+
+/**
+ * Lets something inside either tab open the other — the SEO score on the
+ * settings tab sends an editor to the builder to fix a heading.
+ */
+export function usePageEditorTabs() {
+  return React.useContext(PageEditorTabsContext);
+}
+
 /**
  * Splits the page editor into the builder and everything else.
  *
@@ -20,10 +32,11 @@ export function PageEditorTabs({
   builder: React.ReactNode;
   settings: React.ReactNode;
 }) {
-  const [tab, setTab] = React.useState('builder');
+  const [tab, setTab] = React.useState<string>('builder');
+  const context = React.useMemo(() => ({ show: (next: EditorTab) => setTab(next) }), []);
 
   return (
-    <>
+    <PageEditorTabsContext.Provider value={context}>
       <AdminTabs
         tabs={[
           { id: 'builder', label: 'Page builder', badge: sectionCount },
@@ -47,6 +60,6 @@ export function PageEditorTabs({
       <TabPanel id="settings" active={tab}>
         {settings}
       </TabPanel>
-    </>
+    </PageEditorTabsContext.Provider>
   );
 }

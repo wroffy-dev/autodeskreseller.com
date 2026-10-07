@@ -8,6 +8,10 @@ import { Field, Input, Textarea, Select, Switch } from '@/components/ui/field';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardBody } from '@/components/ui/card';
 import { MediaPicker } from '@/components/admin/media-picker';
+import { PrimaryKeywordsFields } from '@/components/admin/seo/primary-keywords-fields';
+import { SeoScorePanel } from '@/components/admin/seo/seo-score-panel';
+import { jumpResolver } from '@/components/admin/seo/jump';
+import { usePageEditorTabs } from '@/components/admin/pages/page-editor-tabs';
 import { useToast } from '@/components/ui/toast';
 import { Spinner } from '@/components/ui/icons';
 import { pageSlug } from '@/lib/utils/slug';
@@ -35,6 +39,9 @@ export type PageFormValues = {
   twitterTitle: string;
   twitterDescription: string;
   twitterImageId: string | null;
+  primaryKeyword1: string;
+  primaryKeyword2: string;
+  primaryKeyword3: string;
 };
 
 export const EMPTY_PAGE: PageFormValues = {
@@ -57,7 +64,34 @@ export const EMPTY_PAGE: PageFormValues = {
   twitterTitle: '',
   twitterDescription: '',
   twitterImageId: null,
+  primaryKeyword1: '',
+  primaryKeyword2: '',
+  primaryKeyword3: '',
 };
+
+type FormTab = 'general' | 'seo' | 'social';
+
+/** Where each field an SEO check can point at lives on this form. */
+const SEO_FIELDS: Partial<Record<string, { tab: FormTab; id: string }>> = {
+  title: { tab: 'general', id: 'title' },
+  slug: { tab: 'general', id: 'slug' },
+  status: { tab: 'general', id: 'status' },
+  seoTitle: { tab: 'seo', id: 'seoTitle' },
+  seoDescription: { tab: 'seo', id: 'seoDescription' },
+  canonicalUrl: { tab: 'seo', id: 'canonicalUrl' },
+  noIndex: { tab: 'seo', id: 'noIndex' },
+  primaryKeyword1: { tab: 'seo', id: 'primaryKeyword1' },
+  ogTitle: { tab: 'social', id: 'ogTitle' },
+  ogDescription: { tab: 'social', id: 'ogDescription' },
+  ogImage: { tab: 'social', id: 'page-og-image' },
+};
+
+/** A datetime-local value as an instant, so the server reads the editor's time zone. */
+function localToIso(value: string): string {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+}
 
 export function PageForm({
   initial,
@@ -76,8 +110,51 @@ export function PageForm({
   const [values, setValues] = React.useState(initial);
   const [errors, setErrors] = React.useState<Record<string, string[]>>({});
   const [pending, setPending] = React.useState(false);
-  const [tab, setTab] = React.useState<'general' | 'seo' | 'social'>('general');
+  const [tab, setTab] = React.useState<FormTab>('general');
   const [slugTouched, setSlugTouched] = React.useState(mode === 'edit');
+  const editorTabs = usePageEditorTabs();
+
+  const resolveJump = React.useMemo(() => {
+    const builder = editorTabs
+      ? {
+          label: 'Open page builder',
+          run: () => editorTabs.show('builder'),
+        }
+      : undefined;
+    return jumpResolver<FormTab>({
+      fields: SEO_FIELDS,
+      areas: {
+        general: { tab: 'general', label: 'Go to page details' },
+        seo: { tab: 'seo', label: 'Go to SEO settings' },
+        social: { tab: 'social', label: 'Go to social sharing' },
+        ...(builder ? { sections: builder, content: builder, media: builder } : {}),
+      },
+      openTab: setTab,
+    });
+  }, [editorTabs]);
+
+  // What the score panel scores: the form as it stands, saved or not.
+  const seoDraft = {
+    title: values.title,
+    slug: values.slug,
+    status: values.status,
+    publishedAt: localToIso(values.publishedAt),
+    isHomepage: values.isHomepage,
+    seoTitle: values.seoTitle,
+    seoDescription: values.seoDescription,
+    canonicalUrl: values.canonicalUrl,
+    noIndex: values.noIndex,
+    noFollow: values.noFollow,
+    ogTitle: values.ogTitle,
+    ogDescription: values.ogDescription,
+    ogImageId: values.ogImageId,
+    twitterTitle: values.twitterTitle,
+    twitterDescription: values.twitterDescription,
+    twitterImageId: values.twitterImageId,
+    primaryKeyword1: values.primaryKeyword1,
+    primaryKeyword2: values.primaryKeyword2,
+    primaryKeyword3: values.primaryKeyword3,
+  };
 
   const set = <K extends keyof PageFormValues>(key: K, value: PageFormValues[K]) =>
     setValues((current) => ({ ...current, [key]: value }));
@@ -254,6 +331,13 @@ export function PageForm({
 
           {tab === 'seo' ? (
             <>
+              <SeoScorePanel
+                entity={initial.id ? { type: 'PAGE', id: initial.id } : null}
+                payload={{ draft: seoDraft }}
+                resolveJump={resolveJump}
+                emptyMessage="Save this page to see its SEO, AEO and GEO scores. From then on they update as you edit."
+              />
+
               <Field
                 label="SEO title"
                 htmlFor="seoTitle"
@@ -282,6 +366,12 @@ export function PageForm({
                 />
               </Field>
 
+              <PrimaryKeywordsFields
+                values={values}
+                onChange={(field, value) => set(field, value)}
+                errors={errors}
+              />
+
               <Field
                 label="Canonical URL"
                 htmlFor="canonicalUrl"
@@ -297,6 +387,7 @@ export function PageForm({
 
               <div className="space-y-3 rounded-lg border border-hairline p-4">
                 <Switch
+                  id="noIndex"
                   checked={values.noIndex}
                   onChange={(next) => set('noIndex', next)}
                   label="Hide from search engines (noindex)"
@@ -332,7 +423,7 @@ export function PageForm({
                   onChange={(e) => set('ogDescription', e.target.value)}
                 />
               </Field>
-              <Field label="Open Graph image" hint="Recommended 1200×630.">
+              <Field id="page-og-image" label="Open Graph image" hint="Recommended 1200×630.">
                 <MediaPicker
                   value={values.ogImageId}
                   onChange={(id) => set('ogImageId', id)}

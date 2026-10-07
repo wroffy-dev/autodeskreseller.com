@@ -336,9 +336,12 @@
   .text-balance { text-wrap: balance; }
   .text-pretty { text-wrap: pretty; }
 
-  /* Horizontal scroll container used by responsive data tables */
+  /* Horizontal scroll container used by responsive data tables. Relative, so
+     it is the containing block of absolutely positioned descendants — screen
+     reader-only labels included — which otherwise escape the scroll area and
+     widen the whole page on a phone. */
   .scroll-x {
-    @apply overflow-x-auto;
+    @apply relative overflow-x-auto;
     scrollbar-width: thin;
   }
   .scroll-x::-webkit-scrollbar { height: 8px; }

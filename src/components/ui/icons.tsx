@@ -60,6 +60,7 @@ import {
   Settings,
   Check,
 } from 'lucide-react';
+import { CMS_ICON_NAMES, isCmsIconName, type CmsIconName } from './icon-names';
 
 export type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -78,8 +79,8 @@ export const TextIcon = Type;
 
 export { Info, Check, Settings, ImageIcon };
 
-/** Icons an editor may reference by name from a CMS block field. */
-const CMS_ICONS: Record<string, IconComponent> = {
+/** Icons an editor may reference by name from a CMS block field — every name in `icon-names.ts`, and no other. */
+const CMS_ICONS: Record<CmsIconName, IconComponent> = {
   shield: Shield,
   zap: Zap,
   users: Users,
@@ -123,10 +124,11 @@ const CMS_ICONS: Record<string, IconComponent> = {
 
 export function resolveCmsIcon(name: string | null | undefined): IconComponent | null {
   if (!name) return null;
-  return CMS_ICONS[name.trim().toLowerCase()] ?? null;
+  const key = name.trim().toLowerCase();
+  return isCmsIconName(key) ? CMS_ICONS[key] : null;
 }
 
-export const CMS_ICON_NAMES = Object.keys(CMS_ICONS);
+export { CMS_ICON_NAMES };
 
 /*
  * Brand marks, outlined.

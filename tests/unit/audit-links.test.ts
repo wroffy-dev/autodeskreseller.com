@@ -15,6 +15,7 @@ describe('audit log entity links', () => {
     expect(entityHref('Form', 'form-1')).toBe('/admin/forms/form-1');
     expect(entityHref('Customer', 'cust-1')).toBe('/admin/customers/cust-1');
     expect(entityHref('User', 'user-1')).toBe('/admin/staff/user-1');
+    expect(entityHref('City', 'city-1')).toBe('/admin/cities/city-1');
   });
 
   it('does not link settings singletons or types with no detail screen', () => {

@@ -909,6 +909,98 @@ export async function seedCustomers() {
   console.log('  customers: 1');
 }
 
+/**
+ * The initial cities and their draft landing pages: Delhi and Gurugram in the
+ * root market (`/delhi`, `/gurugram`) and Dubai in the UAE (`/ae/dubai`).
+ *
+ * Everything is a draft — the cities and their pages answer 404 until an
+ * editor reviews them and publishes — and the copy is a neutral starting point
+ * that names the city and nothing else: no offices, addresses, testimonials,
+ * certifications or authorisations are invented. Existing cities and pages are
+ * never changed, so this can be run again safely. Run a URL scan afterwards
+ * (Slug & URL Manager) so the registry knows the new pages.
+ */
+export async function seedCities() {
+  const cities = [
+    { country: 'IN', name: 'Delhi', slug: 'delhi', region: null },
+    { country: 'IN', name: 'Gurugram', slug: 'gurugram', region: 'Haryana' },
+    { country: 'AE', name: 'Dubai', slug: 'dubai', region: null },
+  ];
+  let created = 0;
+  for (const entry of cities) {
+    const country = await prisma.country.findUnique({ where: { code: entry.country } });
+    if (!country) continue;
+    let city = await prisma.city.findUnique({ where: { countryId_slug: { countryId: country.id, slug: entry.slug } } });
+    if (!city) {
+      try {
+        city = await prisma.city.create({
+          data: {
+            countryId: country.id,
+            name: entry.name,
+            slug: entry.slug,
+            region: entry.region,
+            status: 'DRAFT',
+            isActive: false,
+            isPublished: false,
+          },
+        });
+        created += 1;
+      } catch (error) {
+        // The address is already somebody else's (the database refuses it):
+        // leave it alone rather than move anything to make room.
+        console.log(`  cities: skipped ${entry.name} — ${error instanceof Error ? error.message.split('\n').pop() : 'address in use'}`);
+        continue;
+      }
+    }
+    const existing = await prisma.page.findUnique({ where: { countryId_slug: { countryId: country.id, slug: entry.slug } } });
+    if (existing) continue;
+    const page = await prisma.page.create({
+      data: {
+        countryId: country.id,
+        title: `Autodesk reseller in ${entry.name}`,
+        slug: entry.slug,
+        status: 'DRAFT',
+        cityId: city.id,
+        isCityHomepage: true,
+        seoTitle: `Autodesk reseller in ${entry.name}`,
+        seoDescription: `Buy and renew Autodesk subscriptions for teams in ${entry.name}${entry.region ? `, ${entry.region}` : ''}.`,
+        primaryKeyword1: `autodesk reseller ${entry.name.toLowerCase()}`,
+        sections: {
+          create: [
+            {
+              blockType: 'hero',
+              name: 'City hero',
+              sortOrder: 10,
+              content: {
+                eyebrow: entry.name,
+                heading: `Autodesk reseller in ${entry.name}`,
+                description: `Licences, renewals and help choosing the right Autodesk products for teams in ${entry.name}.`,
+                primaryCtaLabel: 'Talk to Sales',
+                primaryCtaUrl: country.slug ? `/${country.slug}/contact` : '/contact',
+                alignment: 'left',
+              },
+              settings: { background: 'muted', paddingTop: 'lg', paddingBottom: 'lg' },
+            },
+            {
+              blockType: 'richText',
+              name: 'Local details — review before publishing',
+              sortOrder: 20,
+              content: {
+                heading: `Working with teams in ${entry.name}`,
+                content:
+                  '<p>Replace this paragraph with what is genuinely local: who you serve here, how you support them and how to reach you. Only state what is true — do not add addresses, offices, reviews or certifications that do not exist.</p>',
+              },
+              settings: {},
+            },
+          ],
+        },
+      },
+    });
+    await prisma.page.update({ where: { id: page.id }, data: { groupKey: page.id } });
+  }
+  console.log(`  cities: ${created} added as drafts (${cities.map((entry) => entry.slug).join(', ')})`);
+}
+
 async function main() {
   console.log('Seeding database…');
   // Markets come first: pages, articles, menus and leads all belong to one.
@@ -925,6 +1017,7 @@ async function main() {
     await seedProducts();
     await seedForms();
     await seedPages();
+    await seedCities();
     await seedBlog();
     await seedNavigation();
     await seedLeads();

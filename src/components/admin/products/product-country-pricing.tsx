@@ -14,6 +14,22 @@ import { SettingsSection, SettingsDivider } from '@/components/admin/settings-se
 import { useToast } from '@/components/ui/toast';
 import { Spinner } from '@/components/ui/icons';
 import { SUPPORTED_CURRENCIES } from '@/lib/utils/money';
+import { PrimaryKeywordsFields } from '@/components/admin/seo/primary-keywords-fields';
+import { SeoScorePanel } from '@/components/admin/seo/seo-score-panel';
+import { jumpResolver } from '@/components/admin/seo/jump';
+import type { PrimaryKeywordField } from '@/lib/seo/keywords';
+
+/** The fields of this panel an SEO check can point at. */
+const SEO_FIELDS = {
+  status: { id: 'pc-status' },
+  seoTitle: { id: 'pc-seo-title' },
+  seoDescription: { id: 'pc-seo-description' },
+  canonicalUrl: { id: 'pc-canonical' },
+  noIndex: { id: 'pc-noindex' },
+  primaryKeyword1: { id: 'pc-primaryKeyword1' },
+};
+
+const resolveJump = jumpResolver({ fields: SEO_FIELDS });
 
 /**
  * A product's configuration per market.
@@ -53,6 +69,9 @@ export type ProductCountryValues = {
   seoDescription: string;
   canonicalUrl: string;
   noIndex: boolean;
+  primaryKeyword1: string;
+  primaryKeyword2: string;
+  primaryKeyword3: string;
 };
 
 export function ProductCountryPricing({
@@ -60,12 +79,16 @@ export function ProductCountryPricing({
   rows,
   forms,
   canEdit,
+  sharedKeywords = [],
 }: {
   productId: string;
   rows: ProductCountryValues[];
   forms: Array<{ id: string; name: string }>;
   canEdit: boolean;
+  /** The product's own keywords, which a market with none of its own uses. */
+  sharedKeywords?: string[];
 }) {
+  const [errors, setErrors] = React.useState<Record<string, string[]>>({});
   const router = useRouter();
   const { toast } = useToast();
   const [values, setValues] = React.useState(rows);
@@ -113,10 +136,15 @@ export function ProductCountryPricing({
     data.set('seoDescription', row.seoDescription);
     data.set('canonicalUrl', row.canonicalUrl);
     data.set('noIndex', String(row.noIndex));
+    data.set('primaryKeyword1', row.primaryKeyword1);
+    data.set('primaryKeyword2', row.primaryKeyword2);
+    data.set('primaryKeyword3', row.primaryKeyword3);
 
+    setErrors({});
     const result = await saveProductCountry(data);
     setPending(false);
     if (!result.ok) {
+      setErrors(result.fieldErrors ?? {});
       toast(result.error, 'error');
       return;
     }
@@ -370,11 +398,63 @@ export function ProductCountryPricing({
               onChange={(e) => set({ seoDescription: e.target.value })}
             />
           </Field>
+          <PrimaryKeywordsFields
+            idPrefix="pc-"
+            values={active}
+            onChange={(field: PrimaryKeywordField, value) => set({ [field]: value })}
+            errors={errors}
+            disabled={!canEdit}
+            placeholders={{
+              primaryKeyword1: sharedKeywords[0] ?? '',
+              primaryKeyword2: sharedKeywords[1] ?? '',
+              primaryKeyword3: sharedKeywords[2] ?? '',
+            }}
+            description={
+              sharedKeywords.length > 0
+                ? `Leave all three blank to use the product's own keywords (shown in grey). Set any to target different searches in ${active.countryName}.`
+                : `The searches this product page should answer in ${active.countryName}. Blank uses the product's own keywords, set under SEO above.`
+            }
+          />
           <Switch
+            id="pc-noindex"
             checked={active.noIndex}
             onChange={(next) => set({ noIndex: next })}
             label="Hide from search engines in this country"
           />
+          <SeoScorePanel
+            key={active.countryId}
+            entity={{ type: 'PRODUCT_MARKET', id: productId, countryId: active.countryId }}
+            marketName={active.countryName}
+            payload={{
+              marketDraft: {
+                status: active.status,
+                currency: active.currency,
+                monthlyPrice: active.monthlyPrice,
+                annualPrice: active.annualPrice,
+                compareAtPrice: active.compareAtPrice,
+                priceSuffix: active.priceSuffix,
+                priceNote: active.priceNote,
+                shortDescription: active.shortDescription,
+                ctaLabel: active.ctaLabel,
+                seoTitle: active.seoTitle,
+                seoDescription: active.seoDescription,
+                canonicalUrl: active.canonicalUrl,
+                noIndex: active.noIndex,
+                primaryKeyword1: active.primaryKeyword1,
+                primaryKeyword2: active.primaryKeyword2,
+                primaryKeyword3: active.primaryKeyword3,
+              },
+            }}
+            resolveJump={resolveJump}
+            defaultExpanded={false}
+            rememberExpanded={false}
+          />
+          {!active.exists ? (
+            <p className="text-xs text-muted">
+              {active.countryName} does not sell this product yet, so this is a preview of its page
+              there once it is published.
+            </p>
+          ) : null}
         </SettingsSection>
       </CardBody>
 

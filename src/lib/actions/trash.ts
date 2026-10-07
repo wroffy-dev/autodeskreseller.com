@@ -5,10 +5,12 @@ import { prisma } from '@/lib/db/prisma';
 import { authorize, type SessionUser } from '@/lib/auth/guards';
 import { recordAudit } from '@/lib/services/audit';
 import { uniqueSlug, originalSlug } from '@/lib/utils/slug';
+import { isAddressTaken, patternAddress, releaseRoutes, syncRoutes } from '@/lib/urls/content-sync';
+import { joinMarket } from '@/lib/urls/path';
 import { success, failure, toActionError, type ActionResult } from '@/lib/utils/result';
 import { scopeForUser } from '@/lib/country/admin';
 import { offerIn } from '@/lib/country/availability';
-import { getCountryById } from '@/lib/country/registry';
+import { getCountryById, getDefaultCountry } from '@/lib/country/registry';
 import { revalidateCountryPage } from '@/lib/country/revalidate';
 import type { PermissionKey } from '@/lib/auth/permissions';
 import type { TrashKind } from '@/lib/services/trash';
@@ -96,21 +98,45 @@ async function load(kind: Kind, id: string) {
 async function freeSlug(kind: Kind, id: string, parked: string, countryId: string | null) {
   const wanted = originalSlug(parked);
 
+  // The address must be free of every kind of content and redirect, not just
+  // of other rows in the same table.
+  const market = countryId ? await getCountryById(countryId) : null;
+  const root = await getDefaultCountry();
+
   const taken = async (candidate: string): Promise<boolean> => {
     switch (kind) {
       case 'page':
-        return Boolean(
-          await prisma.page.findFirst({
-            where: { slug: candidate, countryId: countryId ?? undefined, id: { not: id } },
-            select: { id: true },
-          }),
+        return (
+          Boolean(
+            await prisma.page.findFirst({
+              where: { slug: candidate, countryId: countryId ?? undefined, id: { not: id } },
+              select: { id: true },
+            }),
+          ) ||
+          (await isAddressTaken(prisma, joinMarket(market?.slug ?? '', candidate), {
+            entityId: id,
+            countryId: countryId ?? '',
+          }))
         );
       case 'post':
-        return Boolean(
-          await prisma.blogPost.findFirst({
-            where: { slug: candidate, countryId: countryId ?? undefined, id: { not: id } },
-            select: { id: true },
-          }),
+        return (
+          Boolean(
+            await prisma.blogPost.findFirst({
+              where: { slug: candidate, countryId: countryId ?? undefined, id: { not: id } },
+              select: { id: true },
+            }),
+          ) ||
+          (countryId === root.id &&
+            (await isAddressTaken(
+              prisma,
+              await patternAddress(prisma, {
+                type: 'BLOG_POST',
+                countryId: root.id,
+                marketSlug: root.slug,
+                slug: candidate,
+              }),
+              { entityId: id, countryId: root.id },
+            )))
         );
       case 'productCategory':
         return Boolean(
@@ -132,18 +158,39 @@ async function freeSlug(kind: Kind, id: string, parked: string, countryId: strin
   return uniqueSlug(wanted, taken);
 }
 
-async function putBack(kind: Kind, id: string, slug: string, user: SessionUser) {
+async function putBack(
+  kind: Kind,
+  id: string,
+  slug: string,
+  user: SessionUser,
+  countryId: string | null,
+) {
   switch (kind) {
     case 'page':
-      await prisma.page.update({
-        where: { id },
-        data: { deletedAt: null, status: 'DRAFT', slug, updatedById: user.id },
+      // Back as a draft, with its address registered again in the same step.
+      await prisma.$transaction(async (tx) => {
+        await tx.page.update({
+          where: { id },
+          // Not a landing page until the registry says so from its address:
+          // the city may have a new one by now.
+          data: { deletedAt: null, status: 'DRAFT', slug, isCityHomepage: false, updatedById: user.id },
+        });
+        await syncRoutes(tx, [{ type: 'PAGE', entityId: id, countryId: countryId ?? '' }], {
+          actor: user,
+          reason: 'RESTORE',
+        });
       });
       return;
     case 'post':
-      await prisma.blogPost.update({
-        where: { id },
-        data: { deletedAt: null, status: 'DRAFT', slug },
+      await prisma.$transaction(async (tx) => {
+        await tx.blogPost.update({
+          where: { id },
+          data: { deletedAt: null, status: 'DRAFT', slug },
+        });
+        await syncRoutes(tx, [{ type: 'BLOG_POST', entityId: id, countryId: countryId ?? '' }], {
+          actor: user,
+          reason: 'RESTORE',
+        });
       });
       return;
     case 'productCategory':
@@ -178,7 +225,7 @@ export async function restoreFromTrash(kind: Kind, id: string): Promise<ActionRe
     if (!row.deletedAt) return failure(`That ${LABEL[kind].toLowerCase()} is not deleted.`);
 
     const slug = await freeSlug(kind, id, row.slug, row.countryId);
-    await putBack(kind, id, slug, user);
+    await putBack(kind, id, slug, user, row.countryId);
 
     await recordAudit({
       actor: user,
@@ -236,10 +283,24 @@ export async function purgeFromTrash(kind: Kind, id: string): Promise<ActionResu
 
     switch (kind) {
       case 'page':
-        await prisma.page.delete({ where: { id } });
-        break;
       case 'post':
-        await prisma.blogPost.delete({ where: { id } });
+        // Whatever address it still held goes with it; its URL history stays.
+        await prisma.$transaction(async (tx) => {
+          await releaseRoutes(
+            tx,
+            [
+              {
+                type: kind === 'page' ? ('PAGE' as const) : ('BLOG_POST' as const),
+                entityId: id,
+                countryId: row.countryId ?? '',
+                label: row.name,
+              },
+            ],
+            { actor: user },
+          );
+          if (kind === 'page') await tx.page.delete({ where: { id } });
+          else await tx.blogPost.delete({ where: { id } });
+        });
         break;
       case 'productCategory':
         // Products keep existing; the relation is SET NULL by the schema.

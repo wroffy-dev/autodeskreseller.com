@@ -64,7 +64,7 @@ export type CountrySettingsView = {
   /**
    * Market-wide noindex.
    *
-   * Emitted as a meta tag and header on every page in the market, never as a
+   * Emitted as a robots meta tag on every page in the market, never as a
    * robots.txt rule: a blocked page is never fetched, so its noindex is never
    * read and it can still be listed from other signals.
    */

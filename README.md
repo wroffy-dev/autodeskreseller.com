@@ -5,7 +5,7 @@ is entirely content-managed: pages, products, blog posts, navigation, branding,
 SEO and tracking are all edited from the admin panel, with no code changes and
 no redeploy.
 
-**Version 1.1.0** — see [CHANGELOG.md](./CHANGELOG.md) for what changed and
+**Version 1.2.0** — see [CHANGELOG.md](./CHANGELOG.md) for what changed and
 [VERSION_README.md](./VERSION_README.md) for how releases are versioned and
 deployed. The running version is shown in Admin → Settings → Application
 information.
@@ -27,6 +27,8 @@ information.
 - [Deploying to Microsoft Azure](#deploying-to-microsoft-azure)
 - [File storage: local, S3 and Cloudflare R2](#file-storage-local-s3-and-cloudflare-r2)
 - [Backup and restore](#backup-and-restore)
+- [URLs, slugs and redirects](#urls-slugs-and-redirects)
+- [SEO Intelligence](#seo-intelligence)
 - [Forms](#forms)
 - [Email and SMTP](#email-and-smtp)
 - [Marketing and tracking](#marketing-and-tracking)
@@ -34,6 +36,9 @@ information.
 - [Security notes](#security-notes)
 - [Troubleshooting](#troubleshooting)
 - [Countries](docs/MULTI-COUNTRY.md)
+- [Cities](docs/CITIES.md)
+- [URL registry and Slug & URL Manager](docs/URL-REGISTRY.md)
+- [SEO Intelligence](docs/SEO-INTELLIGENCE.md)
 - [Versioning and releases](VERSION_README.md)
 - [Changelog](CHANGELOG.md)
 
@@ -49,6 +54,23 @@ information.
   pricing and SEO all read the `Country` table, so no route, component or
   deployment changes. Full reference:
   **[docs/MULTI-COUNTRY.md](docs/MULTI-COUNTRY.md)**.
+
+**Cities inside a market**
+- Local landing pages at `/delhi`, `/gurugram` and `/ae/dubai` — and later
+  city/product pages such as `/delhi/autocad` — each an ordinary page built in
+  the Page Builder. A city is a draft, published or archived; cities can be
+  imported from a CSV. The City Page Generator copies a page into many cities
+  as drafts, filling `{{city}}`, `{{region}}` and `{{country}}`; every copy is
+  independent from the moment it exists, and regenerating one is an explicit,
+  previewed choice. Full reference: **[docs/CITIES.md](docs/CITIES.md)**.
+
+**SEO Intelligence**
+- SEO, AEO and GEO scores (0–100, overall 50/25/25) for every page, product
+  market, article, archive and city page, with prioritised fixes, filters by
+  country, type, score, severity and audit status, and stale-result detection.
+  Deterministic and versioned; AEO and GEO are internal content-readiness
+  assessments. Full reference:
+  **[docs/SEO-INTELLIGENCE.md](docs/SEO-INTELLIGENCE.md)**.
 
 **Public website**
 - Every page — the homepage included — is a database row built from ordered CMS
@@ -176,6 +198,7 @@ openssl rand -base64 32   # ENCRYPTION_KEY
 | `npm run db:seed` | Seed roles, permissions, the admin and demo content |
 | `npm run db:studio` | Prisma Studio |
 | `npm run db:rehearse` | Rehearse pending migrations against a restored production dump |
+| `npm run urls:backfill` | Register every public address in the URL registry (`-- --dry-run` to report without writing) |
 | `./scripts/smoke.sh` | Boot the production build and run the HTTP smoke suite |
 
 ---
@@ -189,8 +212,8 @@ openssl rand -base64 32   # ENCRYPTION_KEY
 | `DATABASE_URL` | yes | PostgreSQL connection string |
 | `AUTH_SECRET` | yes | Signs session tokens. At least 16 characters |
 | `ENCRYPTION_KEY` | recommended | Encrypts the stored SMTP password. Falls back to `AUTH_SECRET` |
-| `NEXTAUTH_URL` | yes in production | The deployment's public URL |
-| `NEXT_PUBLIC_SITE_URL` | yes in production | Used for canonical URLs, the sitemap and email links |
+| `NEXTAUTH_URL` | yes in production | The deployment's public URL — the address visitors end up on after any redirect |
+| `NEXT_PUBLIC_SITE_URL` | yes in production | Used for canonical URLs, the sitemap and email links. Same value as `NEXTAUTH_URL`: if the bare domain redirects to www, both are `https://www.…` |
 | `STORAGE_DRIVER` | no | `local` (default), `s3` or `r2`. Nothing else is needed for `local` |
 | `UPLOAD_DIR` | no | Where `local` writes. Default `/data/uploads`. Must be a persistent volume |
 | `MEDIA_PUBLIC_PATH` | no | URL prefix media is served under. Default `/media` |
@@ -390,6 +413,18 @@ That checks the homepage, `/api/health`, `/api/ready`, `robots.txt`,
 `sitemap.xml`, the login page, and that `/admin` is gated. No credentials needed,
 nothing destructive.
 
+Two more checks, both read-only:
+
+```bash
+# Every address (bare and www, http and https) arrives at the real one with a
+# permanent redirect, keeping the path and query, and the canonical tags,
+# og:url, robots.txt and the sitemaps all use that address.
+npm run check:domain -- https://www.your-domain.com /pricing
+
+# Which pages ask not to be indexed: X-Robots-Tag and the robots meta tag.
+npm run check:indexing -- https://www.your-domain.com / /pricing /ae
+```
+
 ## File storage: local, S3 and Cloudflare R2
 
 The CMS never knows which backend is in use — everything goes through
@@ -466,6 +501,56 @@ default.
 
 Full setup, the Coolify volume and cron configuration, retention rules and
 troubleshooting: **[docs/BACKUP-RESTORE.md](docs/BACKUP-RESTORE.md)**.
+
+---
+
+## URLs, slugs and redirects
+
+Every public address belongs to exactly one thing — a page, a product in one
+market, an article, a redirect — recorded in the **URL registry** and managed in
+**Admin → SEO → Slug & URL Manager**:
+
+- move `/products/autocad` to `/autocad` for every product with one pattern, or
+  for one market only (`/ae/products/autocad` → `/ae/autocad`);
+- give one page or product its own address (`/autocad` → `/software/autocad`);
+- move the blog (`/blog/article` → `/insights/article`);
+- bulk changes and CSV import/export, each previewed before anything moves;
+- bulk redirects from a two-column CSV (`URL,Destination URL`), validated
+  against every existing redirect and content address before anything is
+  written, with explicit keep-or-replace decisions for conflicts;
+- automatic permanent redirects from every address that has been public,
+  straight to the content — never through a chain — with query strings kept;
+- conflicts, a full history with restore, and URL Health (404s, broken
+  redirects, broken internal links).
+
+The registry ships switched off, so upgrading changes nothing. To adopt it:
+deploy, run the scan (`npm run urls:backfill -- --dry-run` to rehearse it),
+review Conflicts, then switch it on in the manager. Switching it off again is
+the rollback.
+
+Requests on the bare domain are redirected to the configured `www` host (or the
+other way round), keeping path and query; set `CANONICAL_HOST_REDIRECT=false`
+if a proxy already does it.
+
+Full reference — how an address is decided, rollout, recovery, permissions and
+limitations: **[docs/URL-REGISTRY.md](docs/URL-REGISTRY.md)**.
+
+---
+
+## SEO Intelligence
+
+**Admin → Content & SEO → SEO Intelligence** scores every public URL for SEO,
+AEO and GEO from 0 to 100, with an overall score weighted SEO 50%, AEO 25%,
+GEO 25%. Every check explains what it found and how to fix it; checks that do
+not apply to a page are N/A and leave the denominator. Scores are cached with
+the content version and audit time they were calculated for, and a score whose
+content, address, settings or engine version has moved is shown as outdated.
+Up to three target keywords per page, product, article or category are
+analysis inputs only — no keywords meta tag is output.
+
+AEO and GEO are **internal content-readiness assessments**: they do not
+measure AI citations, rankings or visibility. Full reference, including every
+rule: **[docs/SEO-INTELLIGENCE.md](docs/SEO-INTELLIGENCE.md)**.
 
 ---
 
@@ -584,6 +669,14 @@ it was writable.
 **Sign-in loops back to `/auth-control-panel/admin`.** `NEXTAUTH_URL` does not
 match the URL you are actually visiting, so the session cookie is scoped to a
 different origin.
+
+**Canonical URLs and the sitemap point at an address that redirects.** The
+domain moved — typically the bare domain now redirects to www — and
+`NEXT_PUBLIC_SITE_URL` / `NEXTAUTH_URL` still name the old address. Admin →
+SEO warns when the address you are browsing differs from the site address.
+Set both to the address the redirect ends on and redeploy; they are read at
+startup, so no rebuild of the image is needed. `npm run check:domain` confirms
+it.
 
 **Emails are not arriving.** Check that email is switched on in Admin →
 Settings → Email, then use **Test connection** followed by **Send test** — the

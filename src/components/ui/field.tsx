@@ -69,6 +69,7 @@ export function FieldError({ messages }: { messages?: string[] | string | null }
 }
 
 export function Field({
+  id,
   label,
   htmlFor,
   required,
@@ -77,6 +78,8 @@ export function Field({
   className,
   children,
 }: {
+  /** For a field with no single input (a media picker), so it can be scrolled to. */
+  id?: string;
   label?: string;
   htmlFor?: string;
   required?: boolean;
@@ -86,7 +89,7 @@ export function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn('space-y-1.5', className)}>
+    <div id={id} className={cn('space-y-1.5', className)}>
       {label ? (
         <Label htmlFor={htmlFor} required={required}>
           {label}
@@ -134,6 +137,7 @@ export function Checkbox({
 }
 
 export function Switch({
+  id,
   checked,
   onChange,
   label,
@@ -141,6 +145,7 @@ export function Switch({
   name,
   disabled,
 }: {
+  id?: string;
   checked: boolean;
   onChange: (next: boolean) => void;
   label?: React.ReactNode;
@@ -157,6 +162,7 @@ export function Switch({
         </div>
       ) : null}
       <button
+        id={id}
         type="button"
         role="switch"
         aria-checked={checked}

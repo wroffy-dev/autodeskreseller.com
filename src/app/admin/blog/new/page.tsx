@@ -5,6 +5,7 @@ import { AdminPageHeader } from '@/components/admin/page-header';
 import { PostForm } from '@/components/admin/blog/post-form';
 import { EMPTY_POST } from '@/lib/cms/post-model';
 import { getAdminCountryScope } from '@/lib/country/admin';
+import { effectivePattern, patternHint } from '@/lib/urls/hints';
 
 export const metadata: Metadata = { title: 'New post' };
 export const dynamic = 'force-dynamic';
@@ -57,6 +58,7 @@ export default async function NewPost() {
         canPublish={userCan(user, 'blog.publish')}
         canEdit
         mode="create"
+        urlHint={patternHint(await effectivePattern('BLOG_POST', null))}
       />
     </>
   );

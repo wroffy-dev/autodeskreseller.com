@@ -12,6 +12,7 @@ import { ButtonLink, buttonClasses } from '@/components/ui/button';
 import Link from 'next/link';
 import { listPageCategoryOptions } from '@/lib/services/page-categories';
 import { resolveListCountry, countryFilterDefinition } from '@/lib/admin/country-filter';
+import { listCityOptions } from '@/lib/services/cities';
 import type { Prisma } from '@prisma/client';
 
 export const metadata: Metadata = { title: 'Pages' };
@@ -27,6 +28,7 @@ export default async function PagesAdmin({
     status?: string;
     category?: string;
     country?: string;
+    city?: string;
     page?: string;
   }>;
 }) {
@@ -52,6 +54,15 @@ export default async function PagesAdmin({
   if (params.category === 'none') where.categoryId = null;
   else if (params.category) where.categoryId = params.category;
 
+  // A city's pages, or pages outside every city. The city must be in a market
+  // in view; any other id is ignored.
+  const cityOptions = await listCityOptions(
+    country.countryId ? [country.countryId] : country.countries.map((row) => row.id),
+  );
+  const city = cityOptions.find((option) => option.id === params.city);
+  if (params.city === 'none') where.cityId = null;
+  else if (city) where.cityId = city.id;
+
   const [rows, total, categoryOptions] = await Promise.all([
     prisma.page.findMany({
       where,
@@ -67,6 +78,8 @@ export default async function PagesAdmin({
         updatedAt: true,
         country: { select: { code: true, name: true, slug: true } },
         category: { select: { id: true, name: true } },
+        city: { select: { name: true } },
+        isCityHomepage: true,
         _count: { select: { sections: true } },
       },
     }),
@@ -89,6 +102,8 @@ export default async function PagesAdmin({
     isHomepage: row.isHomepage,
     updatedAt: row.updatedAt.toISOString(),
     categoryName: row.category?.name ?? null,
+    cityName: row.city?.name ?? null,
+    isCityHomepage: row.isCityHomepage,
     countryName: row.country.name,
     countryCode: row.country.code,
     countrySlug: row.country.slug,
@@ -108,6 +123,19 @@ export default async function PagesAdmin({
         { label: 'Archived', value: 'ARCHIVED' },
       ],
     },
+    ...(cityOptions.length > 0
+      ? [
+          {
+            name: 'city',
+            label: 'City',
+            allLabel: 'Any city',
+            options: [
+              { label: 'Not in a city', value: 'none' },
+              ...cityOptions.map((option) => ({ label: option.name, value: option.id })),
+            ],
+          },
+        ]
+      : []),
     {
       name: 'category',
       label: 'Category',
@@ -172,7 +200,7 @@ export default async function PagesAdmin({
           countries={country.countries
             .filter((row) => row.isActive)
             .map((row) => ({ id: row.id, code: row.code, name: row.name }))}
-          filtered={Boolean(params.q || params.status)}
+          filtered={Boolean(params.q || params.status || params.city)}
         />
         {tableRows.length > 0 ? (
           <AdminPagination

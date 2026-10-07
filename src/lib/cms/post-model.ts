@@ -32,7 +32,10 @@ export type PostFormValues = {
   sidebarMode: 'GLOBAL' | 'CUSTOM' | 'NONE';
   seoTitle: string;
   seoDescription: string;
-  focusKeyword: string;
+  /** The first replaces the old single focus keyword. */
+  primaryKeyword1: string;
+  primaryKeyword2: string;
+  primaryKeyword3: string;
   canonicalUrl: string;
   noIndex: boolean;
   noFollow: boolean;
@@ -62,7 +65,9 @@ export const EMPTY_POST: PostFormValues = {
   sidebarMode: 'GLOBAL',
   seoTitle: '',
   seoDescription: '',
-  focusKeyword: '',
+  primaryKeyword1: '',
+  primaryKeyword2: '',
+  primaryKeyword3: '',
   canonicalUrl: '',
   noIndex: false,
   noFollow: false,

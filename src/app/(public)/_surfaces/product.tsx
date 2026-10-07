@@ -1,18 +1,19 @@
 import type { Metadata } from 'next';
-import { getPublicProduct, getProductSeo, findLiveProductCountries } from '@/lib/services/products';
+import { getPublicProductById, getProductSeoById } from '@/lib/services/products';
 import { getMediaByIds } from '@/lib/services/media';
-import { redirectOrNotFound } from '@/lib/services/redirects';
 import { taxonomyHrefs } from '@/lib/services/taxonomy-pages';
 import { getWebsiteSettings } from '@/lib/services/settings';
-import { buildMetadata, absoluteCountryUrl } from '@/lib/seo/metadata';
+import { buildMetadata } from '@/lib/seo/metadata';
+import { effectiveKeywords } from '@/lib/seo/keywords';
 import { JsonLd } from '@/components/seo/json-ld';
-import { countryBreadcrumbSchema, productSchema } from '@/lib/seo/structured-data';
+import { productPageJsonLd } from '@/lib/seo/page-schema';
 import { SectionList, type RenderableSection } from '@/components/cms/section-renderer';
 import { getProductSections, getProductSettings } from '@/lib/services/product-cms';
 import { productStyleVars } from '@/lib/cms/product-settings';
 import type { ProductRenderContext } from '@/lib/cms/product-render';
 import { cn } from '@/lib/utils/cn';
-import type { CountryContext } from '@/lib/country/types';
+import { productAlternates } from '@/lib/urls/alternates';
+import { missingContent, type PublicTarget } from '@/lib/urls/resolve';
 
 /**
  * A product page, in one market.
@@ -20,52 +21,46 @@ import type { CountryContext } from '@/lib/country/types';
  * Identity, specification and imagery come from the global product; price,
  * currency, availability, local copy and SEO come from that market's
  * `ProductCountry` row — which is also what decides whether the page exists
- * there at all.
+ * there at all. The product is the one the URL registry resolved, by id, so it
+ * renders the same whether its address is `/products/autocad`, `/autocad` or a
+ * market's own custom URL.
  */
 
-export async function productMetadata(
-  country: CountryContext,
-  slug: string,
-): Promise<Metadata> {
-  const [row, alternates] = await Promise.all([
-    getProductSeo(country.id, slug),
-    findLiveProductCountries(slug),
-  ]);
+export async function productMetadata(target: PublicTarget): Promise<Metadata> {
+  const row = target.id ? await getProductSeoById(target.country.id, target.id) : null;
   if (!row) return { title: 'Product not found', robots: { index: false, follow: false } };
 
   const product = row.product;
+  const alternates = await productAlternates(product);
 
   return buildMetadata({
     title: row.seoTitle || product.seoTitle || product.name,
     description: row.seoDescription || product.seoDescription || product.shortDescription,
-    path: `/products/${slug}`,
-    country,
-    alternateCountryIds: alternates,
+    publicPath: target.path,
+    country: target.country,
+    alternates,
     canonicalUrl: row.canonicalUrl || product.canonicalUrl,
     noIndex: row.noIndex || product.noIndex,
     ogImageUrl: row.ogImage?.url ?? product.ogImage?.url ?? product.image?.url ?? null,
     type: 'product',
+    // The market's own keywords, or the product's when the market set none.
+    keywords: effectiveKeywords(row, product).keywords,
   });
 }
 
-export async function ProductSurface({
-  country,
-  slug,
-}: {
-  country: CountryContext;
-  slug: string;
-}) {
+export async function ProductSurface({ target }: { target: PublicTarget }) {
+  const { country } = target;
   const [product, site, settings] = await Promise.all([
-    getPublicProduct(country, slug),
+    target.id ? getPublicProductById(country, target.id) : Promise.resolve(null),
     getWebsiteSettings(),
     getProductSettings(),
   ]);
   /*
-   * A product this market does not sell — renamed, retired, or never offered
-   * here — follows a redirect if one was written for its address. A renamed
-   * product's old URL is exactly what the redirect manager is for.
+   * A product this market does not sell — retired, a draft, or never offered
+   * here — is a 404 at its address. (Before the registry, a redirect written
+   * for the address was tried first, and still is while it is switched off.)
    */
-  if (!product) return redirectOrNotFound(country, `products/${slug}`);
+  if (!product) return missingContent(target);
 
   const [gallery, detail, sidebar, taxonomy] = await Promise.all([
     getMediaByIds(product.galleryIds),
@@ -133,25 +128,7 @@ export async function ProductSurface({
         </div>
       </div>
 
-      <JsonLd
-        data={[
-          productSchema({
-            name: product.name,
-            description: product.shortDescription,
-            url: absoluteCountryUrl(country, `products/${product.slug}`),
-            imageUrl: product.imageUrl,
-            price: product.monthlyPrice,
-            currency: product.currency,
-            sku: product.sku,
-            brand: site.siteName,
-          }),
-          countryBreadcrumbSchema(country, [
-            { name: 'Home', path: '' },
-            { name: 'Plans', path: 'pricing' },
-            { name: product.name, path: `products/${product.slug}` },
-          ]),
-        ]}
-      />
+      <JsonLd data={productPageJsonLd(country, product, site.siteName, detail)} />
     </div>
   );
 }

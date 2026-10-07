@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { blogPath } from '@/lib/cms/blog-render';
+import { getUrlSnapshot } from '@/lib/urls/load';
 import Link from 'next/link';
 import { Eye, Palette } from 'lucide-react';
 import type { BlogSurface } from '@prisma/client';
@@ -21,6 +23,8 @@ export const dynamic = 'force-dynamic';
  */
 export default async function BlogLayoutAdmin() {
   const user = await requireAnyPermission(['blog.sections', 'blog.sidebar', 'blog.edit']);
+  // The blog's address comes from the URL registry.
+  await getUrlSnapshot();
 
   const [listing, article, sidebar] = await Promise.all([
     getBlogSectionRows('LISTING'),
@@ -58,7 +62,7 @@ export default async function BlogLayoutAdmin() {
               Blog design
             </Link>
             <Link
-              href="/blog"
+              href={blogPath()}
               target="_blank"
               rel="noopener noreferrer"
               className={buttonClasses('outline', 'md')}

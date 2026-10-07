@@ -4,6 +4,7 @@ import { requirePermission, userCan } from '@/lib/auth/guards';
 import { AdminPageHeader } from '@/components/admin/page-header';
 import { TagManager, type TagRow } from '@/components/admin/blog/tag-manager';
 import { Card } from '@/components/ui/card';
+import { effectivePattern } from '@/lib/urls/hints';
 
 export const metadata: Metadata = { title: 'Blog tags' };
 export const dynamic = 'force-dynamic';
@@ -70,6 +71,7 @@ export default async function BlogTags({
           query={query}
           canEdit={userCan(user, 'blog.edit')}
           canDelete={userCan(user, 'blog.delete')}
+          urlPattern={await effectivePattern('BLOG_TAG', null)}
         />
       </Card>
     </div>

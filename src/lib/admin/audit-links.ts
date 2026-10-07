@@ -9,6 +9,7 @@
  */
 const ENTITY_ROUTES: Record<string, string> = {
   BlogPost: '/admin/blog',
+  City: '/admin/cities',
   Customer: '/admin/customers',
   Form: '/admin/forms',
   Lead: '/admin/leads',

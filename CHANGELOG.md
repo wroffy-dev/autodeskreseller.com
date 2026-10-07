@@ -8,7 +8,101 @@ This project uses [semantic versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
 ---
 
-## [Unreleased]
+## [1.2.0] — 2026-10-07
+
+### Added
+
+- **Slug & URL Manager** (Admin → Content & SEO → Slug & URL Manager,
+  `/admin/slug-manager`) and the **URL registry** behind it. Every public
+  address — pages, products per market, blog posts and the blog archive,
+  categories and tags, category/brand landing pages and city pages — belongs to
+  exactly one thing, by stable id, enforced by a unique normalised key in the
+  database across content and redirect sources. Tabs: All URLs, URL Patterns,
+  Redirects, Conflicts, History and URL Health, with search, country/type/
+  status filters, an editing drawer with live availability and impact preview,
+  validated history restore, and state kept in the address bar.
+  - Addresses follow **custom address → country pattern → global pattern**
+    (then the built-in default, which is what the site already used, so
+    nothing moves on upgrade): `/products/autocad` → `/autocad`,
+    `/autocad` → `/software/autocad`, `/ae/products/autocad` → `/ae/autocad`.
+    A title edit never changes a published address.
+  - When a published address changes, a permanent redirect goes **straight to
+    the content by id**, so every historical address reaches the current one
+    with no chain; loops, chains, self-redirects and ownership conflicts are
+    refused. Redirects answer before rendering with a real **308 / 307**
+    status and `Location` header, labelled as such.
+  - System routes, authentication, APIs, assets and market prefixes are
+    protected; all public links, canonicals, breadcrumbs, sitemaps, hreflang,
+    structured data and the country switcher are built from the registry.
+  - Ships **switched off**: deploy, scan, review conflicts, switch on.
+    Switching off is the rollback. See [docs/URL-REGISTRY.md](docs/URL-REGISTRY.md).
+- **Redirects → Import CSV** with exactly two columns, `URL,Destination URL`:
+  sample download, upload or paste, 308/307 for the file, whole-graph
+  validation against existing rules and content, explicit keep-or-replace
+  decisions for conflicting rules, chain flattening and re-pointing of rules
+  that would become chains, stale-preview protection, batched and resumable
+  application with progress, row-level results (downloadable) and safe
+  retries. Same-site absolute URLs, explicit market prefixes and destination
+  query strings and fragments are kept. Separate from the address CSV.
+- **Cities** (Admin → Locations → Cities): a city belongs to a country, with
+  an optional region and a **Draft / Published / Archived** status (drafts and
+  archived cities answer 404). Search, country/status filters, pagination,
+  counts, add/edit/archive, deletion only once a city has no pages, bulk CSV
+  import with validation and progress, and links to each city page's editor,
+  preview and SEO analysis. Initial cities `/delhi`, `/gurugram` and
+  `/ae/dubai` are available as a draft seed step (`prisma/seed/pages-cities.ts`).
+- **City Page Generator**: independent, editable draft copies of a template
+  page or any CMS page, with `{{city}}`, `{{country}}` and `{{region}}`
+  (an empty region disappears with its separator), an impact preview, and an
+  explicit, confirmed choice to regenerate an existing page (what it held is
+  kept in the run's record). Optional product for future city/product pages
+  (`/delhi/autocad`), recorded as an explicit `CityProduct` association.
+- **SEO Intelligence** (Admin → Content & SEO → SEO Intelligence): SEO, AEO
+  and GEO scores 0–100 and an overall score (SEO 50%, AEO 25%, GEO 25%) for
+  every page, product market, article, archive and city page; a website
+  overview; prioritised issues with explanations and fixes; filters by
+  country, city, content type, score, severity and audit status; individual
+  rescans and bounded bulk audits; audit time, content version and stale-result
+  indicators; up to three target keywords per item as analysis inputs. A
+  deterministic, versioned rule engine over the effective public content, with
+  N/A checks left out of the denominator. AEO and GEO are labelled as internal
+  content-readiness assessments. See [docs/SEO-INTELLIGENCE.md](docs/SEO-INTELLIGENCE.md).
+- `npm run urls:backfill` (`-- --dry-run` to rehearse), `npm run check:domain`
+  and `npm run check:indexing`.
+
+### Changed
+
+- The Redirects screen moved into the Slug & URL Manager; `/admin/redirects`
+  forwards there.
+- Requests on the bare domain or `www` twin of `NEXT_PUBLIC_SITE_URL` are
+  redirected to it (308), keeping path and query; `CANONICAL_HOST_REDIRECT=false`
+  turns this off.
+- Target keywords are never output as a `<meta name="keywords">` tag.
+- Syncing or cloning a market leaves city pages out; the Pages list gains a
+  City filter.
+- Saves, status changes, section edits and address changes refresh the
+  affected URLs' SEO scores after the response.
+
+### Database
+
+Additive migrations, applied by `prisma migrate deploy`. No data is reset,
+dropped or rewritten, and no public address changes when they run:
+
+- `20260925140000_seo_intelligence` — primary keyword columns and the
+  `SeoAudit` cache; an article's focus keyword is copied into its first
+  primary keyword.
+- `20260929120000_url_registry` — `UrlRoute`, `UrlPattern`, `UrlHistory`,
+  `UrlNotFound`, `UrlOperation`, `UrlSettings` (resolver off), new columns on
+  `Redirect` and `Page`; `Redirect.source` uniqueness moves to the registry.
+- `20260930120000_cities` — `City`, `CityPageBatch`, city columns on `Page`,
+  with constraints and triggers keeping city pages in their city's market.
+- `20261007120000_city_status_products_redirect_suffix` — city status,
+  `CityProduct`, `Redirect.destinationSuffix`, `Page.generatedHash`, and
+  database triggers guarding city address spaces and market prefixes.
+
+Rollout: deploy → scan (Slug & URL Manager → *Run first scan*, or
+`npm run urls:backfill`) → review Conflicts → switch the registry on → run
+*Recalculate all* in SEO Intelligence once.
 
 ### Fixed
 

@@ -1,8 +1,8 @@
 {
   "name": "dropbox-reseller",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "release": {
-    "date": "2026-09-16"
+    "date": "2026-10-07"
   },
   "private": true,
   "scripts": {
@@ -25,6 +25,9 @@
     "seed:prod": "node prisma/seed.mjs",
     "verify:production": "node scripts/verify-production.mjs",
     "db:rehearse": "node scripts/rehearse-migration.mjs",
+    "check:indexing": "node scripts/check-indexing.mjs",
+    "check:domain": "node scripts/check-domain.mjs",
+    "urls:backfill": "tsx --conditions=react-server --tsconfig tsconfig.json scripts/urls-backfill.ts",
     "market:clone": "node scripts/clone-market.mjs",
     "release": "node scripts/release.mjs",
     "admin:dark-css": "node scripts/admin-dark-css.mjs"

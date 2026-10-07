@@ -10,6 +10,7 @@ import { productInputSchema, productCategorySchema, brandSchema } from '@/lib/va
 import { uniqueSlug, slugify, originalSlug } from '@/lib/utils/slug';
 import { toDecimal } from '@/lib/utils/money';
 import { sanitizeHtml, sanitizeText } from '@/lib/utils/sanitize';
+import { keywordsFromForm } from '@/lib/seo/keywords';
 import { success, failure, toActionError, type ActionResult } from '@/lib/utils/result';
 import { listActiveCountries } from '@/lib/country/registry';
 import { scopeForUser } from '@/lib/country/admin';
@@ -19,6 +20,21 @@ import { ensureTaxonomyPage } from '@/lib/services/taxonomy-pages';
 import type { TaxonomyKind } from '@/lib/cms/taxonomy-pages';
 import { countryPath } from '@/lib/country/routing';
 import type { SessionUser } from '@/lib/auth/guards';
+import { refreshSeoScores } from '@/lib/seo/intelligence/refresh';
+import {
+  captureBefore,
+  describeTakenAddress,
+  isAddressTaken,
+  landingPageRefs,
+  patternAddress,
+  productRefs,
+  releaseRoutes,
+  syncRoutes,
+} from '@/lib/urls/content-sync';
+import type { ContentInfo } from '@/lib/urls/content';
+import type { Tx } from '@/lib/urls/registry';
+import { addressesOf, revalidateAddresses } from '@/lib/urls/revalidate';
+import type { CountryContext } from '@/lib/country/types';
 
 /**
  * Revalidates a product's page in every market that could be serving it.
@@ -27,14 +43,44 @@ import type { SessionUser } from '@/lib/auth/guards';
  * market still has to clear that market's URL — and only touching `/products/x`
  * would leave `/ae/products/x` stale.
  */
-async function revalidateProduct(slug: string) {
+async function revalidateProduct(slug: string, productId?: string) {
   const countries = await listActiveCountries();
   for (const country of countries) {
     revalidatePath(countryPath(country, `products/${slug}`));
   }
+  // Wherever the registry has the product now, in every market.
+  if (productId) revalidateAddresses(await addressesOf(productId));
   revalidatePath('/sitemap.xml');
   // Product blocks appear on CMS pages, so the whole public tree is affected.
   revalidatePath('/', 'layout');
+}
+
+/**
+ * Whether a candidate slug is free for a product in a market: no other
+ * product has it, and the address its pattern gives it is not already owned
+ * by a page, an article or a redirect.
+ */
+async function productSlugTaken(
+  candidate: string,
+  market: Pick<CountryContext, 'id' | 'slug'>,
+  exceptProductId?: string,
+): Promise<boolean> {
+  const clash = await prisma.product.findFirst({
+    where: { slug: candidate, ...(exceptProductId ? { id: { not: exceptProductId } } : {}) },
+    select: { id: true },
+  });
+  if (clash) return true;
+  const address = await patternAddress(prisma, {
+    type: 'PRODUCT',
+    countryId: market.id,
+    marketSlug: market.slug,
+    slug: candidate,
+  });
+  return isAddressTaken(
+    prisma,
+    address,
+    exceptProductId ? { entityId: exceptProductId, countryId: market.id } : undefined,
+  );
 }
 
 /** Parses the multi-value fields that arrive as JSON strings from the form. */
@@ -85,6 +131,7 @@ function readProductForm(formData: FormData) {
     canonicalUrl: formData.get('canonicalUrl'),
     noIndex: formData.get('noIndex') === 'true',
     ogImageId: formData.get('ogImageId'),
+    ...keywordsFromForm(formData),
   });
 }
 
@@ -126,36 +173,64 @@ function toPrismaData(input: ReturnType<typeof readProductForm>) {
     canonicalUrl: input.canonicalUrl,
     noIndex: input.noIndex,
     ogImageId: input.ogImageId,
+    primaryKeyword1: input.primaryKeyword1,
+    primaryKeyword2: input.primaryKeyword2,
+    primaryKeyword3: input.primaryKeyword3,
   };
+}
+
+/** Every market version of some products, for refreshing their scores after a change. */
+function productMarketRefs(productIds: readonly string[]) {
+  return async () =>
+    (
+      await prisma.productCountry.findMany({
+        where: { productId: { in: [...productIds] }, deletedAt: null },
+        select: { productId: true, countryId: true },
+        take: 200,
+      })
+    ).map((row) => ({ type: 'PRODUCT_MARKET' as const, id: row.productId, countryId: row.countryId }));
 }
 
 export async function createProduct(formData: FormData): Promise<ActionResult<{ id: string }>> {
   try {
     const user = await authorize('products.create');
     const input = readProductForm(formData);
+    const scope = await scopeForUser(user);
 
-    const slug = await uniqueSlug(input.slug || slugify(input.name), async (candidate) => {
-      const existing = await prisma.product.findUnique({
-        where: { slug: candidate },
-        select: { id: true },
+    // A slug the editor typed is theirs: if its address is taken, say so
+    // rather than quietly publishing the product somewhere else.
+    const typed = String(formData.get('slug') ?? '').trim() !== '';
+    if (typed && input.slug && (await productSlugTaken(input.slug, scope.country))) {
+      const address = await patternAddress(prisma, {
+        type: 'PRODUCT',
+        countryId: scope.country.id,
+        marketSlug: scope.country.slug,
+        slug: input.slug,
       });
-      return Boolean(existing);
-    });
+      const why = (await describeTakenAddress(prisma, address)) ?? 'Another product already uses that URL.';
+      return failure(why, { slug: [why] });
+    }
+    const slug = await uniqueSlug(input.slug || slugify(input.name), (candidate) =>
+      productSlugTaken(candidate, scope.country),
+    );
 
-    const product = await prisma.product.create({
-      data: {
-        ...toPrismaData(input),
-        slug,
-        publishedAt: input.status === 'PUBLISHED' ? (input.publishedAt ?? new Date()) : input.publishedAt,
-        createdById: user.id,
-        updatedById: user.id,
-      },
-    });
+    const product = await prisma.$transaction(async (tx) => {
+      const created = await tx.product.create({
+        data: {
+          ...toPrismaData(input),
+          slug,
+          publishedAt: input.status === 'PUBLISHED' ? (input.publishedAt ?? new Date()) : input.publishedAt,
+          createdById: user.id,
+          updatedById: user.id,
+        },
+      });
 
-    // A new product goes on sale in the market the admin is working in, at the
-    // price they just entered. Other markets stay untouched until somebody
-    // prices it there.
-    await syncCountryPricing(user, product.id, pricingFrom(input, product.currency));
+      // A new product goes on sale in the market the admin is working in, at
+      // the price they just entered — and gets its address there. Other
+      // markets stay untouched until somebody prices it there.
+      await syncCountryPricing(user, created.id, pricingFrom(input, created.currency), {}, { tx });
+      return created;
+    });
 
     await recordAudit({
       actor: user,
@@ -167,7 +242,8 @@ export async function createProduct(formData: FormData): Promise<ActionResult<{ 
     });
 
     revalidatePath('/admin/products');
-    await revalidateProduct(slug);
+    await revalidateProduct(slug, product.id);
+    refreshSeoScores(productMarketRefs([product.id]));
     return success({ id: product.id }, 'Product created.');
   } catch (error) {
     return toActionError(error);
@@ -193,25 +269,39 @@ async function syncCountryPricing(
   productId: string,
   patch: Prisma.ProductCountryUncheckedUpdateInput & { currency?: string },
   defaults: Partial<Prisma.ProductCountryUncheckedCreateInput> = {},
+  options: { tx?: Tx; routes?: boolean } = {},
 ): Promise<void> {
   const scope = await scopeForUser(user);
   const countryId = scope.country.id;
 
-  await prisma.productCountry.upsert({
-    where: { productId_countryId: { productId, countryId } },
-    // Saving a product while working in a market that had withdrawn it is a
-    // decision to offer it there again.
-    update: { ...patch, deletedAt: null },
-    // A market that does not sell the product yet starts from what was just
-    // entered, so saving a product never leaves it for sale nowhere.
-    create: {
-      currency: scope.country.currency,
-      ...defaults,
-      ...(patch as Prisma.ProductCountryUncheckedCreateInput),
-      productId,
-      countryId,
-    },
-  });
+  const run = async (db: Tx) => {
+    await db.productCountry.upsert({
+      where: { productId_countryId: { productId, countryId } },
+      // Saving a product while working in a market that had withdrawn it is a
+      // decision to offer it there again.
+      update: { ...patch, deletedAt: null },
+      // A market that does not sell the product yet starts from what was just
+      // entered, so saving a product never leaves it for sale nowhere.
+      create: {
+        currency: scope.country.currency,
+        ...defaults,
+        ...(patch as Prisma.ProductCountryUncheckedCreateInput),
+        productId,
+        countryId,
+      },
+    });
+    // Offered here, so it has an address here. In the same transaction, so a
+    // product never goes on sale at an address that is not registered.
+    if (options.routes !== false) {
+      await syncRoutes(db, [{ type: 'PRODUCT', entityId: productId, countryId }], {
+        actor: user,
+        reason: 'EDIT',
+      });
+    }
+  };
+
+  if (options.tx) await run(options.tx);
+  else await prisma.$transaction(run);
 }
 
 /** The commercial fields of the product form, as one market's configuration. */
@@ -243,7 +333,13 @@ export async function updateProduct(productId: string, formData: FormData): Prom
     if (!before || before.deletedAt) return failure('That product no longer exists.');
 
     const input = readProductForm(formData);
-    const slug = input.slug || before.slug;
+    /*
+     * The address follows the slug field, never the name: a blank slug keeps
+     * the product where it is, so renaming a product can never quietly move
+     * its published URL.
+     */
+    const typedSlug = String(formData.get('slug') ?? '').trim();
+    const slug = typedSlug ? input.slug || before.slug : before.slug;
 
     if (slug !== before.slug) {
       const clash = await prisma.product.findFirst({
@@ -253,27 +349,49 @@ export async function updateProduct(productId: string, formData: FormData): Prom
       if (clash) return failure('Another product already uses that URL.', { slug: ['This URL is taken'] });
     }
 
-    const updated = await prisma.product.update({
-      where: { id: productId },
-      data: {
-        ...toPrismaData(input),
-        slug,
-        publishedAt:
-          input.status === 'PUBLISHED'
-            ? (input.publishedAt ?? before.publishedAt ?? new Date())
-            : input.publishedAt,
-        updatedById: user.id,
-      },
-    });
+    /*
+     * The product, its market pricing, its address in every market that
+     * follows the pattern, the redirects from the addresses it leaves and the
+     * URL history are saved together. Markets with a custom address keep it.
+     */
+    const [updated, moves] = await prisma.$transaction(async (tx) => {
+      const refs = await productRefs(tx, productId);
+      const snapshot: Map<string, ContentInfo> = await captureBefore(tx, refs);
+      const saved = await tx.product.update({
+        where: { id: productId },
+        data: {
+          ...toPrismaData(input),
+          slug,
+          publishedAt:
+            input.status === 'PUBLISHED'
+              ? (input.publishedAt ?? before.publishedAt ?? new Date())
+              : input.publishedAt,
+          updatedById: user.id,
+        },
+      });
 
-    // The form edits the market the admin is in, so its price, status and
-    // ordering land where the public site reads them.
-    await syncCountryPricing(user, productId, {
-      ...pricingFrom(input, updated.currency),
-      publishedAt:
-        input.status === 'PUBLISHED'
-          ? (input.publishedAt ?? before.publishedAt ?? new Date())
-          : input.publishedAt,
+      // The form edits the market the admin is in, so its price, status and
+      // ordering land where the public site reads them.
+      await syncCountryPricing(
+        user,
+        productId,
+        {
+          ...pricingFrom(input, saved.currency),
+          publishedAt:
+            input.status === 'PUBLISHED'
+              ? (input.publishedAt ?? before.publishedAt ?? new Date())
+              : input.publishedAt,
+        },
+        {},
+        { tx, routes: false },
+      );
+
+      const outcome = await syncRoutes(tx, await productRefs(tx, productId), {
+        actor: user,
+        reason: slug !== before.slug ? 'SLUG' : 'EDIT',
+        before: snapshot,
+      });
+      return [saved, outcome] as const;
     });
 
     await recordAudit({
@@ -298,9 +416,25 @@ export async function updateProduct(productId: string, formData: FormData): Prom
 
     revalidatePath('/admin/products');
     revalidatePath(`/admin/products/${productId}`);
-    await revalidateProduct(before.slug);
-    if (slug !== before.slug) await revalidateProduct(slug);
-    return success(undefined, 'Product saved.');
+    await revalidateProduct(before.slug, productId);
+    if (slug !== before.slug) await revalidateProduct(slug, productId);
+    revalidateAddresses(moves.flatMap((move) => [move.oldPath, move.newPath]));
+    // The shared fields show in every market that sells the product.
+    refreshSeoScores(async () =>
+      (
+        await prisma.productCountry.findMany({
+          where: { productId, deletedAt: null },
+          select: { countryId: true },
+        })
+      ).map((row) => ({ type: 'PRODUCT_MARKET' as const, id: productId, countryId: row.countryId })),
+    );
+    const redirected = moves.filter((move) => move.status === 'moved' && move.redirectId);
+    return success(
+      undefined,
+      redirected.length > 0
+        ? `Product saved. ${redirected.map((move) => `${move.oldPath} now redirects to ${move.newPath}`).join('; ')}.`
+        : 'Product saved.',
+    );
   } catch (error) {
     return toActionError(error);
   }
@@ -336,6 +470,7 @@ export async function setProductStatus(
 
     revalidatePath('/admin/products');
     await revalidateProduct(product.slug);
+    refreshSeoScores(productMarketRefs([productId]));
     return success(undefined, `Product ${status.toLowerCase()}.`);
   } catch (error) {
     return toActionError(error);
@@ -467,57 +602,64 @@ export async function duplicateProduct(productId: string): Promise<ActionResult<
     });
     if (!source) return failure('That product no longer exists.');
 
-    const slug = await uniqueSlug(`${source.slug}-copy`, async (candidate) => {
-      const existing = await prisma.product.findUnique({
-        where: { slug: candidate },
-        select: { id: true },
-      });
-      return Boolean(existing);
-    });
+    const scope = await scopeForUser(user);
+    const slug = await uniqueSlug(`${source.slug}-copy`, (candidate) =>
+      productSlugTaken(candidate, scope.country),
+    );
 
     const { id, createdAt, updatedAt, sku, ...rest } = source;
     void id;
     void createdAt;
     void updatedAt;
 
-    const copy = await prisma.product.create({
-      data: {
-        ...rest,
-        variants: undefined,
-        sections: undefined,
-        name: `${source.name} (copy)`,
-        slug,
-        sku: sku ? `${sku}-COPY` : null,
-        status: 'DRAFT',
-        isFeatured: false,
-        publishedAt: null,
-        createdById: user.id,
-        updatedById: user.id,
-        features: source.features as Prisma.InputJsonValue,
-        benefits: source.benefits as Prisma.InputJsonValue,
-        specs: source.specs as Prisma.InputJsonValue,
-        galleryIds: source.galleryIds as Prisma.InputJsonValue,
-      },
-    });
+    const copy = await prisma.$transaction(async (tx) => {
+      const created = await tx.product.create({
+        data: {
+          ...rest,
+          variants: undefined,
+          sections: undefined,
+          name: `${source.name} (copy)`,
+          slug,
+          sku: sku ? `${sku}-COPY` : null,
+          status: 'DRAFT',
+          isFeatured: false,
+          publishedAt: null,
+          createdById: user.id,
+          updatedById: user.id,
+          features: source.features as Prisma.InputJsonValue,
+          benefits: source.benefits as Prisma.InputJsonValue,
+          specs: source.specs as Prisma.InputJsonValue,
+          galleryIds: source.galleryIds as Prisma.InputJsonValue,
+        },
+      });
 
-    /*
-     * The copy carries the source's pricing into the market being worked in,
-     * as a draft. Duplicating a product to reprice it is the common case, and
-     * an empty Country pricing tab would make the copy look broken.
-     */
-    await syncCountryPricing(user, copy.id, {
-      status: 'DRAFT',
-      publishedAt: null,
-      isFeatured: false,
-      sortOrder: source.sortOrder,
-      featuredOrder: source.featuredOrder,
-      currency: source.currency,
-      monthlyPrice: source.monthlyPrice,
-      annualPrice: source.annualPrice,
-      compareAtPrice: source.compareAtPrice,
-      discountPercent: source.discountPercent,
-      priceSuffix: source.priceSuffix,
-      priceNote: source.priceNote,
+      /*
+       * The copy carries the source's pricing into the market being worked
+       * in, as a draft. Duplicating a product to reprice it is the common
+       * case, and an empty Country pricing tab would make the copy look
+       * broken. It gets its address there in the same transaction.
+       */
+      await syncCountryPricing(
+        user,
+        created.id,
+        {
+          status: 'DRAFT',
+          publishedAt: null,
+          isFeatured: false,
+          sortOrder: source.sortOrder,
+          featuredOrder: source.featuredOrder,
+          currency: source.currency,
+          monthlyPrice: source.monthlyPrice,
+          annualPrice: source.annualPrice,
+          compareAtPrice: source.compareAtPrice,
+          discountPercent: source.discountPercent,
+          priceSuffix: source.priceSuffix,
+          priceNote: source.priceNote,
+        },
+        {},
+        { tx },
+      );
+      return created;
     });
 
     /*
@@ -594,7 +736,7 @@ export async function deleteProduct(productId: string): Promise<ActionResult> {
     });
     if (!product) return failure('That product no longer exists.');
 
-    const removed = await withdrawFromMarket(productId, scope.country.id);
+    const removed = await withdrawFromMarket(productId, scope.country.id, user);
     if (!removed) {
       return failure(`${scope.country.name} does not offer that product.`);
     }
@@ -622,11 +764,15 @@ export async function deleteProduct(productId: string): Promise<ActionResult> {
  * Returns false when the market did not offer the product to begin with, so the
  * caller can say so rather than reporting a delete that deleted nothing.
  */
-async function withdrawFromMarket(productId: string, countryId: string): Promise<boolean> {
+async function withdrawFromMarket(
+  productId: string,
+  countryId: string,
+  actor: SessionUser,
+): Promise<boolean> {
   return prisma.$transaction(async (tx) => {
     const config = await tx.productCountry.findUnique({
       where: { productId_countryId: { productId, countryId } },
-      select: { id: true, deletedAt: true },
+      select: { id: true, deletedAt: true, product: { select: { name: true } } },
     });
     if (!config || config.deletedAt) return false;
 
@@ -634,6 +780,17 @@ async function withdrawFromMarket(productId: string, countryId: string): Promise
       where: { id: config.id },
       data: { deletedAt: new Date(), status: 'ARCHIVED', isFeatured: false },
     });
+
+    /*
+     * Its address in this market is released, not redirected: where the
+     * product's visitors should go now is a decision for a person (Slug & URL
+     * Manager → History or URL Health), never a default.
+     */
+    await releaseRoutes(
+      tx,
+      [{ type: 'PRODUCT', entityId: productId, countryId, label: config.product.name }],
+      { actor },
+    );
 
     /*
      * Only when nothing is left. A product still on sale somewhere must keep a
@@ -690,14 +847,15 @@ export async function restoreProduct(productId: string): Promise<ActionResult> {
     });
     if (!product) return failure('That product no longer exists.');
 
+    /*
+     * The product comes back under the URL it had when that address is still
+     * free. When something else has taken it since, the product comes back as
+     * a draft under a free one, and the message says so — nothing is taken
+     * from whoever owns the old address now.
+     */
+    const wanted = product.deletedAt ? originalSlug(product.slug) : product.slug;
     const slug = product.deletedAt
-      ? await uniqueSlug(originalSlug(product.slug), async (candidate) => {
-          const clash = await prisma.product.findFirst({
-            where: { slug: candidate, id: { not: productId } },
-            select: { id: true },
-          });
-          return Boolean(clash);
-        })
+      ? await uniqueSlug(wanted, (candidate) => productSlugTaken(candidate, scope.country, productId))
       : product.slug;
 
     await prisma.$transaction(async (tx) => {
@@ -724,6 +882,11 @@ export async function restoreProduct(productId: string): Promise<ActionResult> {
           status: 'ARCHIVED',
         },
       });
+
+      await syncRoutes(tx, [{ type: 'PRODUCT', entityId: productId, countryId: scope.country.id }], {
+        actor: user,
+        reason: 'RESTORE',
+      });
     });
 
     await recordAudit({
@@ -737,8 +900,13 @@ export async function restoreProduct(productId: string): Promise<ActionResult> {
 
     revalidatePath('/admin/products');
     revalidatePath('/admin/products/trash');
-    await revalidateProduct(slug);
-    return success(undefined, `Restored to ${scope.country.name} as a draft.`);
+    await revalidateProduct(slug, productId);
+    return success(
+      undefined,
+      slug !== wanted
+        ? `Restored to ${scope.country.name} as a draft. Its old URL slug “${wanted}” is used by something else now, so it came back as “${slug}”.`
+        : `Restored to ${scope.country.name} as a draft.`,
+    );
   } catch (error) {
     return toActionError(error);
   }
@@ -774,7 +942,23 @@ export async function purgeProduct(productId: string): Promise<ActionResult> {
       );
     }
 
-    await prisma.product.delete({ where: { id: productId } });
+    await prisma.$transaction(async (tx) => {
+      const routes = await tx.urlRoute.findMany({
+        where: { entityId: productId, kind: 'CONTENT' },
+        select: { countryId: true },
+      });
+      await releaseRoutes(
+        tx,
+        routes.map((route) => ({
+          type: 'PRODUCT' as const,
+          entityId: productId,
+          countryId: route.countryId,
+          label: product.name,
+        })),
+        { actor: user },
+      );
+      await tx.product.delete({ where: { id: productId } });
+    });
 
     await recordAudit({
       actor: user,
@@ -830,9 +1014,19 @@ export async function saveProductCategory(
       imageId: input.imageId,
     };
 
-    const category = categoryId
-      ? await prisma.productCategory.update({ where: { id: categoryId }, data })
-      : await prisma.productCategory.create({ data });
+    /*
+     * A category page that follows the category-page pattern moves with the
+     * category's slug, in every market, with a redirect from where it was —
+     * in the same transaction as the rename. A page given its own URL stays.
+     */
+    const category = await prisma.$transaction(async (tx) => {
+      if (!categoryId) return tx.productCategory.create({ data });
+      const refs = await landingPageRefs(tx, 'category', categoryId);
+      const snapshot = await captureBefore(tx, refs);
+      const saved = await tx.productCategory.update({ where: { id: categoryId }, data });
+      await syncRoutes(tx, refs, { actor: user, reason: 'SLUG', before: snapshot, source: 'pattern' });
+      return saved;
+    });
 
     /*
      * A category created while working in a market is offered there. Without
@@ -843,6 +1037,7 @@ export async function saveProductCategory(
      * had removed.
      */
     let generatedPage: string | null = null;
+    let pageConflict: string | null = null;
     if (!categoryId) {
       const scope = await scopeForUser(user);
       await offerIn('PRODUCT_CATEGORY', [category.id], scope.country.id);
@@ -866,6 +1061,7 @@ export async function saveProductCategory(
         user.id,
       );
       generatedPage = page.created ? page.slug : null;
+      if ('conflict' in page) pageConflict = page.conflict;
     }
 
     await recordAudit({
@@ -881,7 +1077,11 @@ export async function saveProductCategory(
     revalidatePath('/', 'layout');
     return success(
       { id: category.id },
-      generatedPage ? `Category saved, with a page at /${generatedPage}.` : 'Category saved.',
+      generatedPage
+        ? `Category saved, with a page at /${generatedPage}.`
+        : pageConflict
+          ? `Category saved. Its page was not created: ${pageConflict}`
+          : 'Category saved.',
     );
   } catch (error) {
     return toActionError(error);
@@ -924,6 +1124,7 @@ export async function generateTaxonomyPage(
 
     const page = await ensureTaxonomyPage(seed, scope.country.id, user.id);
 
+    if ('conflict' in page) return failure(page.conflict);
     if (!page.created) {
       return failure(`A page already exists at /${page.slug}.`);
     }
@@ -1033,7 +1234,7 @@ export async function bulkProductAction(input: unknown): Promise<ActionResult> {
       const scope = await scopeForUser(user);
       let removed = 0;
       for (const product of products) {
-        if (await withdrawFromMarket(product.id, scope.country.id)) removed += 1;
+        if (await withdrawFromMarket(product.id, scope.country.id, user)) removed += 1;
       }
 
       await recordAudit({
@@ -1116,6 +1317,7 @@ export async function bulkProductAction(input: unknown): Promise<ActionResult> {
 
     revalidatePath('/admin/products');
     revalidatePath('/', 'layout');
+    refreshSeoScores(productMarketRefs(products.slice(0, 50).map((row) => row.id)));
     return success(undefined, `${products.length} product(s) updated.`);
   } catch (error) {
     return toActionError(error);
@@ -1169,13 +1371,21 @@ export async function saveBrand(
       logoId: input.logoId,
     };
 
-    const brand = brandId
-      ? await prisma.brand.update({ where: { id: brandId }, data })
-      : await prisma.brand.create({ data });
+    // A brand page following its pattern moves with the brand's slug. See
+    // `saveProductCategory`.
+    const brand = await prisma.$transaction(async (tx) => {
+      if (!brandId) return tx.brand.create({ data });
+      const refs = await landingPageRefs(tx, 'brand', brandId);
+      const snapshot = await captureBefore(tx, refs);
+      const saved = await tx.brand.update({ where: { id: brandId }, data });
+      await syncRoutes(tx, refs, { actor: user, reason: 'SLUG', before: snapshot, source: 'pattern' });
+      return saved;
+    });
 
     // Carried in the market it was created in, and given a page to send
     // people to. See `saveProductCategory`.
     let generatedPage: string | null = null;
+    let pageConflict: string | null = null;
     if (!brandId) {
       const scope = await scopeForUser(user);
       await offerIn('BRAND', [brand.id], scope.country.id);
@@ -1193,6 +1403,7 @@ export async function saveBrand(
         user.id,
       );
       generatedPage = page.created ? page.slug : null;
+      if ('conflict' in page) pageConflict = page.conflict;
     }
 
     await recordAudit({
@@ -1209,7 +1420,11 @@ export async function saveBrand(
     revalidatePath('/', 'layout');
     return success(
       { id: brand.id },
-      generatedPage ? `Brand saved, with a page at /${generatedPage}.` : 'Brand saved.',
+      generatedPage
+        ? `Brand saved, with a page at /${generatedPage}.`
+        : pageConflict
+          ? `Brand saved. Its page was not created: ${pageConflict}`
+          : 'Brand saved.',
     );
   } catch (error) {
     return toActionError(error);

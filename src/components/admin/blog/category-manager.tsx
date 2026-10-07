@@ -36,6 +36,14 @@ const EXTRA_FIELDS: CategoryExtraField[] = [
   { name: 'ogTitle', kind: 'text', label: 'Open Graph title' },
   { name: 'ogDescription', kind: 'textarea', label: 'Open Graph description' },
   { name: 'ogImageId', kind: 'media', label: 'Social share image' },
+  {
+    name: 'primaryKeyword1',
+    kind: 'text',
+    label: 'Primary keyword 1',
+    hint: 'Up to three searches this archive should answer. Analysis inputs for SEO Intelligence only: nothing is added to the page’s markup.',
+  },
+  { name: 'primaryKeyword2', kind: 'text', label: 'Primary keyword 2' },
+  { name: 'primaryKeyword3', kind: 'text', label: 'Primary keyword 3' },
   { name: 'noIndex', kind: 'switch', label: 'Hide from search engines (noindex)' },
   { name: 'noFollow', kind: 'switch', label: 'Do not follow links (nofollow)' },
 ];
@@ -50,10 +58,13 @@ export function BlogCategoryManager({
   rows,
   canEdit,
   canDelete,
+  urlPattern = '/blog/category/{slug}',
 }: {
   rows: CategoryRow[];
   canEdit: boolean;
   canDelete: boolean;
+  /** Where category archives live, from the URL pattern the site serves now. */
+  urlPattern?: string;
 }) {
   return (
     <CategoryTreeManager
@@ -61,11 +72,12 @@ export function BlogCategoryManager({
       canEdit={canEdit}
       canDelete={canDelete}
       urlPrefix="/blog/category/"
+      urlPattern={urlPattern}
       itemLabel="post"
       withSeo
       extraFields={EXTRA_FIELDS}
       extraDefaults={{ isActive: true, noIndex: false, noFollow: false }}
-      emptyDescription="Categories create archive pages at /blog/category/…"
+      emptyDescription={`Categories create archive pages at ${urlPattern.replace('{slug}', '…')}`}
       onSave={(id, data) => saveBlogCategory(id, data)}
       // Blog categories have no bulk move-on-delete action; posts simply become
       // uncategorised, which is what deleteBlogCategory already does.

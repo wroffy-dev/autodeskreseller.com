@@ -13,6 +13,7 @@ import { BulkBar, useSelection } from '@/components/admin/row-menu';
 import { useToast } from '@/components/ui/toast';
 import { Spinner } from '@/components/ui/icons';
 import { slugify } from '@/lib/utils/slug';
+import { fillPattern } from '@/lib/urls/path';
 
 export type TagRow = {
   id: string;
@@ -75,11 +76,14 @@ export function TagManager({
   query,
   canEdit,
   canDelete,
+  urlPattern = '/blog/tag/{slug}',
 }: {
   rows: TagRow[];
   query: string;
   canEdit: boolean;
   canDelete: boolean;
+  /** Where tag archives live, from the URL pattern the site serves now. */
+  urlPattern?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -259,7 +263,7 @@ export function TagManager({
                   </Td>
                   <Td>
                     <code className="rounded bg-muted/10 px-1.5 py-0.5 font-mono text-xs text-muted">
-                      /blog/tag/{row.slug}
+                      {fillPattern(urlPattern, row.slug)}
                     </code>
                   </Td>
                   <Td align="center" className="text-sm text-muted">
@@ -339,7 +343,7 @@ export function TagManager({
                 }
               />
             </Field>
-            <Field label="URL slug" htmlFor="tag-slug" error={errors.slug} hint="/blog/tag/">
+            <Field label="URL slug" htmlFor="tag-slug" error={errors.slug} hint={urlPattern.replace('{slug}', '…')}>
               <Input
                 id="tag-slug"
                 value={editing.slug}
