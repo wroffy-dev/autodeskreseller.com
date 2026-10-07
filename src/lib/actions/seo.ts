@@ -3,7 +3,15 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { prisma } from '@/lib/db/prisma';
-import { authorize } from '@/lib/auth/guards';
+import { authorize, type SessionUser } from '@/lib/auth/guards';
+import { assertCountryAccess, listAccessibleCountries } from '@/lib/country/access';
+import { listCountries } from '@/lib/country/registry';
+import {
+  deleteRedirectRule,
+  ruleMarket,
+  saveRedirectRule,
+  toggleRedirectRule,
+} from '@/lib/urls/redirect-rules';
 import { recordAudit } from '@/lib/services/audit';
 import { sanitizeText } from '@/lib/utils/sanitize';
 import { success, failure, toActionError, type ActionResult } from '@/lib/utils/result';
@@ -93,25 +101,32 @@ export async function saveSeoSettings(formData: FormData): Promise<ActionResult>
 }
 
 const redirectSchema = z.object({
-  source: z
-    .string()
-    .trim()
-    .min(1, 'Enter the old path')
-    .max(500)
-    .transform((v) => (v.startsWith('/') || /^https?:\/\//i.test(v) ? v : `/${v}`)),
-  destination: z
-    .string()
-    .trim()
-    .min(1, 'Enter the new path')
-    .max(500)
-    .transform((v) => (v.startsWith('/') || /^https?:\/\//i.test(v) ? v : `/${v}`)),
+  source: z.string().trim().min(1, 'Enter the old path').max(500),
+  destination: z.string().trim().max(1000).default(''),
+  targetEntityId: z.string().trim().max(60).optional().nullable(),
+  targetCountryId: z.string().trim().max(60).optional().nullable(),
   type: z.enum(['PERMANENT', 'TEMPORARY']).default('PERMANENT'),
   isActive: z.coerce.boolean().default(true),
+  allMarkets: z.coerce.boolean().default(false),
   note: optional(200),
+  expectedUpdatedAt: z.string().max(40).optional().nullable(),
 });
 
-const normalise = (value: string) => value.replace(/^\/+|\/+$/g, '').toLowerCase();
+/** The markets a user may write redirects for, and whether that is all of them. */
+async function redirectAccess(user: SessionUser) {
+  const [mine, all] = await Promise.all([listAccessibleCountries(user, { includeInactive: true }), listCountries()]);
+  return { countryIds: new Set(mine.map((country) => country.id)), everyMarket: mine.length >= all.length };
+}
 
+/**
+ * Creates or updates a redirect rule.
+ *
+ * The rule claims its address in the URL registry, so it cannot shadow a
+ * page or product and no second rule can answer for the same address. A
+ * destination that is some content's address is stored as that content, so
+ * the rule follows it through any rename; a chain is flattened as it is
+ * saved, and a loop is refused.
+ */
 export async function saveRedirect(
   redirectId: string | null,
   formData: FormData,
@@ -120,97 +135,86 @@ export async function saveRedirect(
     const user = await authorize('seo.manage');
     const input = redirectSchema.parse({
       source: formData.get('source'),
-      destination: formData.get('destination'),
+      destination: formData.get('destination') ?? '',
+      targetEntityId: formData.get('targetEntityId') || null,
+      targetCountryId: formData.get('targetCountryId') || null,
       type: formData.get('type') || 'PERMANENT',
       isActive: formData.get('isActive') !== 'false',
+      allMarkets: formData.get('allMarkets') === 'true',
       note: formData.get('note'),
+      expectedUpdatedAt: formData.get('expectedUpdatedAt') || null,
     });
 
-    if (normalise(input.source) === normalise(input.destination)) {
-      return failure('A redirect cannot point at itself.', {
-        destination: ['Choose a different destination'],
-      });
+    if (redirectId) {
+      const market = await ruleMarket(redirectId);
+      if (market?.countryId) await assertCountryAccess(user, market.countryId);
     }
 
-    // Walk the existing chain to make sure this rule does not close a loop.
-    const chain = await detectLoop(input.source, input.destination, redirectId);
-    if (chain) {
-      return failure(`That would create a redirect loop: ${chain}`, {
-        destination: ['This destination redirects back to the source'],
-      });
+    const result = await saveRedirectRule(
+      {
+        id: redirectId,
+        source: input.source,
+        destination: input.destination,
+        target:
+          input.targetEntityId && input.targetCountryId
+            ? { entityId: input.targetEntityId, countryId: input.targetCountryId }
+            : null,
+        type: input.type,
+        isActive: input.isActive,
+        note: input.note ? sanitizeText(input.note) : null,
+        allMarkets: input.allMarkets,
+        expectedUpdatedAt: input.expectedUpdatedAt,
+      },
+      user,
+      await redirectAccess(user),
+    );
+    if (!result.ok) {
+      return failure(result.error, result.field ? { [result.field]: [result.error] } : undefined);
     }
 
-    const clash = await prisma.redirect.findFirst({
-      where: { source: input.source, ...(redirectId ? { id: { not: redirectId } } : {}) },
-      select: { id: true },
-    });
-    if (clash) {
-      return failure('A redirect already exists for that path.', { source: ['This path is already used'] });
-    }
-
-    const redirect = redirectId
-      ? await prisma.redirect.update({ where: { id: redirectId }, data: input })
-      : await prisma.redirect.create({ data: input });
-
+    const saved = await prisma.redirect.findUniqueOrThrow({ where: { id: result.id } });
     await recordAudit({
       actor: user,
       action: redirectId ? 'updated' : 'created',
       entity: 'Redirect',
-      entityId: redirect.id,
-      summary: `${input.source} → ${input.destination}`,
+      entityId: result.id,
+      summary: `${saved.source} → ${saved.destination}`,
     });
 
     revalidatePath('/admin/redirects');
-    return success({ id: redirect.id }, 'Redirect saved.');
+    revalidatePath('/admin/slug-manager');
+    const notes = [
+      result.flattened ? 'It pointed at another redirect, so it now goes straight to where that one ends.' : null,
+      result.dormant.length > 0
+        ? `Content already lives at ${result.dormant.join(', ')}, so it does not apply there.`
+        : null,
+    ].filter(Boolean);
+    return success({ id: result.id }, ['Redirect saved.', ...notes].join(' '));
   } catch (error) {
     return toActionError(error);
   }
 }
 
-/**
- * Follows the destination through existing redirects. Returns the chain as a
- * string when it leads back to the source, otherwise null.
- */
-async function detectLoop(
-  source: string,
-  destination: string,
-  ignoreId: string | null,
-): Promise<string | null> {
-  const seen = new Set<string>([normalise(source)]);
-  const chain = [source];
-  let current = destination;
-
-  for (let depth = 0; depth < 12; depth += 1) {
-    chain.push(current);
-    if (seen.has(normalise(current))) return chain.join(' → ');
-    seen.add(normalise(current));
-
-    if (/^https?:\/\//i.test(current)) return null;
-
-    const next: { destination: string } | null = await prisma.redirect.findFirst({
-      where: {
-        isActive: true,
-        source: current,
-        ...(ignoreId ? { id: { not: ignoreId } } : {}),
-      },
-      select: { destination: true },
-    });
-    if (!next) return null;
-    current = next.destination;
-  }
-
-  return chain.join(' → ');
-}
-
 export async function toggleRedirect(redirectId: string): Promise<ActionResult> {
   try {
-    await authorize('seo.manage');
-    const redirect = await prisma.redirect.findUnique({ where: { id: redirectId } });
-    if (!redirect) return failure('That redirect no longer exists.');
+    const user = await authorize('seo.manage');
+    const market = await ruleMarket(redirectId);
+    if (!market) return failure('That redirect no longer exists.');
+    if (market.countryId) await assertCountryAccess(user, market.countryId);
 
-    await prisma.redirect.update({ where: { id: redirectId }, data: { isActive: !redirect.isActive } });
+    const result = await toggleRedirectRule(redirectId, user);
+    if (!result.ok) return failure('That redirect no longer exists.');
+
+    await recordAudit({
+      actor: user,
+      action: result.isActive ? 'enabled' : 'disabled',
+      entity: 'Redirect',
+      entityId: redirectId,
+      summary: result.isActive ? 'Enabled a redirect' : 'Disabled a redirect',
+    });
     revalidatePath('/admin/redirects');
-    return success(undefined, redirect.isActive ? 'Redirect disabled.' : 'Redirect enabled.');
+    revalidatePath('/admin/slug-manager');
+    return success(undefined, result.isActive ? 'Redirect enabled.' : 'Redirect disabled.');
   } catch (error) {
     return toActionError(error);
   }
@@ -219,20 +223,23 @@ export async function toggleRedirect(redirectId: string): Promise<ActionResult> 
 export async function deleteRedirect(redirectId: string): Promise<ActionResult> {
   try {
     const user = await authorize('seo.manage');
-    const redirect = await prisma.redirect.findUnique({ where: { id: redirectId } });
-    if (!redirect) return failure('That redirect no longer exists.');
+    const market = await ruleMarket(redirectId);
+    if (!market) return failure('That redirect no longer exists.');
+    if (market.countryId) await assertCountryAccess(user, market.countryId);
 
-    await prisma.redirect.delete({ where: { id: redirectId } });
+    const result = await deleteRedirectRule(redirectId);
+    if (!result.ok) return failure('That redirect no longer exists.');
 
     await recordAudit({
       actor: user,
       action: 'deleted',
       entity: 'Redirect',
       entityId: redirectId,
-      summary: `Removed ${redirect.source} → ${redirect.destination}`,
+      summary: `Removed ${result.source} → ${result.destination}`,
     });
 
     revalidatePath('/admin/redirects');
+    revalidatePath('/admin/slug-manager');
     return success(undefined, 'Redirect deleted.');
   } catch (error) {
     return toActionError(error);
