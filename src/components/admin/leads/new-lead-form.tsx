@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { Spinner } from '@/components/ui/icons';
 import { LEAD_STATUS_OPTIONS } from '@/lib/crm/constants';
+import { DateTimeField } from '@/components/ui/date-field';
 
 export function NewLeadForm({
   staff,
@@ -109,7 +110,14 @@ export function NewLeadForm({
               <Input id="value" name="value" inputMode="decimal" placeholder="239000" />
             </Field>
             <Field label="Follow up" htmlFor="followUpAt" error={errors.followUpAt}>
-              <Input id="followUpAt" name="followUpAt" type="datetime-local" />
+              <DateTimeField
+                id="followUpAt"
+                name="followUpAt"
+                label="Follow up"
+                invalid={!!errors.followUpAt}
+                // Parsed on the server, so the browser's zone is not the one applied.
+                showTimeZone={false}
+              />
             </Field>
           </div>
 

@@ -674,9 +674,13 @@ function SortableFieldRow({
           <span className="block truncate font-mono text-xs text-muted">{field.name}</span>
         </button>
 
-        <Badge tone="neutral">{TYPE_LABELS[field.type] ?? field.type}</Badge>
+        {/* On a phone the row keeps only what matters for scanning; the type
+            and mapping are shown again when the field is expanded. */}
+        <span className="hidden shrink-0 items-center gap-1.5 sm:flex">
+          <Badge tone="neutral">{TYPE_LABELS[field.type] ?? field.type}</Badge>
+          {MAPPED_FIELD_TYPES.has(field.type) ? <Badge tone="brand">Mapped</Badge> : null}
+        </span>
         {field.isRequired ? <Badge tone="warning">Required</Badge> : null}
-        {MAPPED_FIELD_TYPES.has(field.type) ? <Badge tone="brand">Mapped</Badge> : null}
 
         {canEdit ? (
           <>

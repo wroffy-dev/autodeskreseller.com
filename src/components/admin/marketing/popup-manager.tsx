@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Plus, Pencil, Trash, Megaphone } from 'lucide-react';
 import { savePopup, togglePopup, deletePopup } from '@/lib/actions/campaigns';
 import { Dialog, ConfirmDialog } from '@/components/ui/dialog';
-import { Field, Input, Select, Textarea, Switch } from '@/components/ui/field';
+import { Field, Input, Select, Textarea, Switch, usePersistedToggle } from '@/components/ui/field';
+import { DateField } from '@/components/ui/date-field';
 import { Button } from '@/components/ui/button';
 import { Table, TableWrap, Th, Td, Tr } from '@/components/ui/table';
 import { EmptyState } from '@/components/ui/states';
@@ -189,21 +190,17 @@ export function PopupManager({
                       : 'Always'}
                   </Td>
                   <Td>
-                    <Badge tone={row.isActive ? 'success' : 'neutral'}>
-                      {row.isActive ? 'Active' : 'Off'}
-                    </Badge>
+                    {canEdit ? (
+                      <PopupActiveSwitch id={row.id} name={row.name} isActive={row.isActive} />
+                    ) : (
+                      <Badge tone={row.isActive ? 'success' : 'neutral'}>
+                        {row.isActive ? 'Active' : 'Off'}
+                      </Badge>
+                    )}
                   </Td>
                   <Td align="right">
                     {canEdit ? (
                       <div className="flex items-center justify-end gap-1">
-                        <button
-                          type="button"
-                          onClick={() => run(() => togglePopup(row.id))}
-                          disabled={pending}
-                          className="rounded px-2 py-1 text-xs text-muted transition-colors hover:bg-muted/10 hover:text-content"
-                        >
-                          {row.isActive ? 'Disable' : 'Enable'}
-                        </button>
                         <button
                           type="button"
                           onClick={() => setEditing(row)}
@@ -410,19 +407,22 @@ export function PopupManager({
                   />
                 </Field>
                 <Field label="Start date" htmlFor="popup-start">
-                  <Input
+                  <DateField
                     id="popup-start"
-                    type="date"
+                    label="Start date"
                     value={editing.startsAt ? editing.startsAt.slice(0, 10) : ''}
-                    onChange={(e) => set({ startsAt: e.target.value || null })}
+                    max={editing.endsAt ? editing.endsAt.slice(0, 10) : undefined}
+                    onChange={(next) => set({ startsAt: next || null })}
                   />
                 </Field>
                 <Field label="End date" htmlFor="popup-end" error={errors.endsAt}>
-                  <Input
+                  <DateField
                     id="popup-end"
-                    type="date"
+                    label="End date"
                     value={editing.endsAt ? editing.endsAt.slice(0, 10) : ''}
-                    onChange={(e) => set({ endsAt: e.target.value || null })}
+                    min={editing.startsAt ? editing.startsAt.slice(0, 10) : undefined}
+                    invalid={!!errors.endsAt}
+                    onChange={(next) => set({ endsAt: next || null })}
                   />
                 </Field>
               </div>
@@ -462,5 +462,47 @@ export function PopupManager({
         pending={pending}
       />
     </>
+  );
+}
+
+/**
+ * A popup's on/off state, saved the moment it is flipped. A failed save puts
+ * the switch back and says why, so the list never shows a state that is not
+ * the stored one.
+ */
+function PopupActiveSwitch({ id, name, isActive }: { id: string; name: string; isActive: boolean }) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const state = usePersistedToggle(isActive, async (next) => {
+    const result = await togglePopup(id, next);
+    if (!result.ok) {
+      toast(result.error, 'error');
+      return { ok: false, error: result.error };
+    }
+    toast(result.message ?? 'Saved.');
+    router.refresh();
+    return { ok: true, value: result.data?.isActive };
+  });
+
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <Switch
+          size="sm"
+          checked={state.checked}
+          pending={state.pending}
+          onChange={state.toggle}
+          label={<span className="sr-only">Show “{name}” on the site</span>}
+        />
+        <span className="text-xs font-medium text-muted" aria-hidden="true">
+          {state.pending ? 'Saving…' : state.checked ? 'Active' : 'Off'}
+        </span>
+      </div>
+      {state.error ? (
+        <p role="alert" className="mt-1 max-w-[12rem] text-xs font-medium text-red-600">
+          Not saved — {state.error}
+        </p>
+      ) : null}
+    </div>
   );
 }

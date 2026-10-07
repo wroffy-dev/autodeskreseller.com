@@ -14,7 +14,7 @@ import { Alert } from '@/components/ui/states';
 import { useToast } from '@/components/ui/toast';
 import { Spinner } from '@/components/ui/icons';
 import { SUPPORTED_CURRENCIES } from '@/lib/utils/money';
-import { cn } from '@/lib/utils/cn';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 
 export type WebsiteSettingsValues = Record<string, string | boolean>;
 
@@ -112,26 +112,26 @@ export function WebsiteSettingsForm({
       ) : null}
 
       <Card>
-        <div className="scroll-x flex items-center gap-1 border-b border-hairline px-3 py-2">
-          {visibleTabs.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              aria-pressed={tab === t.id}
-              className={cn(
-                'shrink-0 rounded-lg px-3 py-1.5 text-sm transition-colors',
-                tab === t.id
-                  ? 'bg-brand/10 font-medium text-brand'
-                  : 'text-muted hover:text-content',
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="border-b border-hairline px-3 pt-1">
+          <SegmentedControl
+            semantics="tabs"
+            variant="underline"
+            label="Settings sections"
+            idPrefix="settings-tab-"
+            panelId={() => 'settings-panel'}
+            className="border-b-0"
+            value={tab}
+            onChange={setTab}
+            options={visibleTabs.map((t) => ({ value: t.id, label: t.label }))}
+          />
         </div>
 
-        <CardBody className="space-y-4">
+        <CardBody
+          className="space-y-4"
+          id="settings-panel"
+          role="tabpanel"
+          aria-labelledby={`settings-tab-${tab}`}
+        >
           <fieldset disabled={!canEdit || pending} className="space-y-4">
             {tab === 'general' ? (
               <>

@@ -44,10 +44,16 @@ const config: Config = {
           from: { opacity: '0', transform: 'translateY(8px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        // Popovers and the search panel: a short fade with a slight drop.
+        'pop-in': {
+          from: { opacity: '0', transform: 'translateY(-4px) scale(0.985)' },
+          to: { opacity: '1', transform: 'none' },
+        },
       },
       animation: {
         'fade-in': 'fade-in .2s ease-out',
         'slide-up': 'slide-up .25s ease-out',
+        'pop-in': 'pop-in .16s cubic-bezier(.2,.8,.2,1)',
       },
     },
   },

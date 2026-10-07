@@ -2,11 +2,13 @@
 
 import * as React from 'react';
 import { SessionProvider } from 'next-auth/react';
+import { usePathname } from 'next/navigation';
 import { AdminSidebar } from './sidebar';
 import { AdminTopbar } from './topbar';
 import { AdminThemeProvider } from './theme';
 import { cn } from '@/lib/utils/cn';
 import type { CountryContext } from '@/lib/country/types';
+import { resetFormEdits, trackFormEdits } from '@/lib/admin/unsaved-changes';
 
 export function AdminShell({
   user,
@@ -69,6 +71,18 @@ export function AdminShell({
     return () => document.body.classList.remove('admin-ui');
   }, []);
 
+  // Edits typed into the current screen, so the topbar search can ask before
+  // leaving it. A new route starts clean.
+  const mainRef = React.useRef<HTMLElement>(null);
+  const pathname = usePathname();
+  React.useEffect(() => {
+    if (!mainRef.current) return;
+    return trackFormEdits(mainRef.current);
+  }, []);
+  React.useEffect(() => {
+    resetFormEdits();
+  }, [pathname]);
+
   return (
     <SessionProvider>
       <AdminThemeProvider>
@@ -110,6 +124,7 @@ export function AdminShell({
               onOpenSidebar={() => setSidebarOpen(true)}
             />
             <main
+              ref={mainRef}
               id="admin-main"
               className="mx-auto w-full max-w-[100rem] px-4 py-6 sm:px-6 sm:py-8"
             >

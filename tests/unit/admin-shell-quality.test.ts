@@ -71,9 +71,12 @@ describe('media library', () => {
   });
 
   it('labels the layout buttons, which carry only an icon', () => {
-    expect(source).toContain('aria-label={label}');
-    expect(source).toContain("label: 'Grid view'");
-    expect(source).toContain("label: 'List view'");
+    // Drawn by the shared segmented control, which names each segment from
+    // its `ariaLabel`.
+    expect(source).toContain("ariaLabel: 'Grid view'");
+    expect(source).toContain("ariaLabel: 'List view'");
+    const control = readFileSync('src/components/ui/segmented-control.tsx', 'utf8');
+    expect(control).toContain('aria-label={option.ariaLabel}');
   });
 
   it('surfaces missing alt text rather than hiding it', () => {

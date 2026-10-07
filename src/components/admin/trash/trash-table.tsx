@@ -12,6 +12,7 @@ import { Button, buttonClasses } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils/cn';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 
 const KIND_LABELS: Record<TrashKind, string> = {
   page: 'Page',
@@ -87,29 +88,19 @@ export function TrashTable({ items, canManage }: { items: TrashedItem[]; canMana
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap gap-1.5">
-        {FILTERS.map((entry) => {
-          const count = counts.get(entry.value) ?? 0;
-          if (entry.value !== 'all' && count === 0) return null;
-          return (
-            <button
-              key={entry.value}
-              type="button"
-              onClick={() => setFilter(entry.value)}
-              aria-pressed={filter === entry.value}
-              className={cn(
-                'rounded-lg border px-3 py-1.5 text-sm transition-colors',
-                filter === entry.value
-                  ? 'border-brand bg-brand/5 text-brand'
-                  : 'border-hairline text-muted hover:text-content',
-              )}
-            >
-              {entry.label}
-              <span className="ml-1.5 text-xs opacity-70">{count}</span>
-            </button>
-          );
-        })}
-      </div>
+      <SegmentedControl
+        label="Show"
+        className="mb-4"
+        value={filter}
+        onChange={setFilter}
+        options={FILTERS.filter(
+          (entry) => entry.value === 'all' || (counts.get(entry.value) ?? 0) > 0,
+        ).map((entry) => ({
+          value: entry.value,
+          label: entry.label,
+          badge: counts.get(entry.value) ?? 0,
+        }))}
+      />
 
       <TableWrap>
         <Table>

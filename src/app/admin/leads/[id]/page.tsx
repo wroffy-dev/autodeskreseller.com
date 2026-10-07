@@ -4,6 +4,7 @@ import { postPath } from '@/lib/cms/blog-render';
 import { getUrlSnapshot } from '@/lib/urls/load';
 import { prisma } from '@/lib/db/prisma';
 import { requirePermission, userCan } from '@/lib/auth/guards';
+import { userCanAccessCountry } from '@/lib/country/access';
 import { AdminPageHeader } from '@/components/admin/page-header';
 import { LeadDetail, type LeadDetailData } from '@/components/admin/leads/lead-detail';
 import {
@@ -80,6 +81,29 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     }),
   ]);
   if (!lead) notFound();
+
+  /*
+   * Other follow-ups already scheduled in this lead's market, listed beside the
+   * follow-up calendar so a new one can be placed around them. Bounded to a
+   * window around today and to markets this user may work in.
+   */
+  const now = new Date();
+  const followUps = (await userCanAccessCountry(user, lead.countryId))
+    ? await prisma.lead.findMany({
+        where: {
+          deletedAt: null,
+          countryId: lead.countryId,
+          id: { not: lead.id },
+          followUpAt: {
+            gte: new Date(now.getTime() - 31 * 86_400_000),
+            lte: new Date(now.getTime() + 120 * 86_400_000),
+          },
+        },
+        orderBy: { followUpAt: 'asc' },
+        take: 60,
+        select: { id: true, name: true, followUpAt: true },
+      })
+    : [];
 
   // The article link comes from the URL registry.
   await getUrlSnapshot();
@@ -214,6 +238,11 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         lead={data}
         staff={staff}
         products={products}
+        followUps={followUps.map((row) => ({
+          id: row.id,
+          name: row.name,
+          at: row.followUpAt!.toISOString(),
+        }))}
         can={{
           edit: userCan(user, 'leads.edit'),
           assign: userCan(user, 'leads.assign'),

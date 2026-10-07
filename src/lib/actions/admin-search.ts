@@ -3,38 +3,51 @@
 import { prisma } from '@/lib/db/prisma';
 import { getCurrentUser, userCan } from '@/lib/auth/guards';
 import { listAccessibleCountries } from '@/lib/country/access';
+import {
+  SEARCH_MAX_QUERY,
+  SEARCH_PER_TYPE,
+  SEARCH_TYPE_ORDER,
+  type SearchHit,
+} from '@/lib/admin/search';
 
-export type SearchHit = {
-  id: string;
-  type: 'Lead' | 'Customer' | 'Page' | 'Product' | 'Post' | 'Media' | 'Staff' | 'Form';
-  title: string;
-  subtitle: string | null;
-  href: string;
-};
+export type { SearchHit } from '@/lib/admin/search';
 
 /**
- * Global admin search. Every group is gated by the caller's permissions, so a
- * Sales user never sees pages or staff in their results.
+ * Global admin search, behind the topbar search field.
  *
- * Market-scoped content is additionally limited to the markets the caller may
- * work in, so search cannot hand someone a page from a storefront they cannot
- * open. Where more than one market exists, each hit names its own.
+ * Every group is gated on the server by the caller's permissions, so a Sales
+ * user never sees pages or staff in their results, and nothing about a group
+ * they cannot open — not even a count — leaves this function.
+ *
+ * Records that belong to a market (pages, cities, posts, leads, forms) are
+ * additionally limited to the markets the caller may work in, so search cannot
+ * hand someone a record from a storefront they cannot open. Where more than one
+ * market exists, each hit names its own.
+ *
+ * Bounded on every axis: the query is trimmed and capped, each type returns at
+ * most SEARCH_PER_TYPE rows, and every lookup is a `contains` on indexed text
+ * columns already used by the module's own list search.
  */
 export async function adminSearch(query: string): Promise<SearchHit[]> {
   const user = await getCurrentUser();
   if (!user) return [];
 
-  const q = query.trim();
+  const q = typeof query === 'string' ? query.trim().slice(0, SEARCH_MAX_QUERY) : '';
   if (q.length < 2) return [];
   const contains = { contains: q, mode: 'insensitive' as const };
-  const take = 5;
+  const take = SEARCH_PER_TYPE;
   const hits: SearchHit[] = [];
 
   const countries = await listAccessibleCountries(user, { includeInactive: true });
   const multiCountry = countries.length > 1;
-  // No restriction rows means every market, which needs no clause at all.
-  const countryScope =
-    user.role === 'super-admin' ? {} : { countryId: { in: countries.map((c) => c.id) } };
+  const countryIds = countries.map((c) => c.id);
+  // A super admin sees every market, which needs no clause at all.
+  const countryScope = user.role === 'super-admin' ? {} : { countryId: { in: countryIds } };
+  // Forms with no market are shared by all of them.
+  const formCountryScope =
+    user.role === 'super-admin'
+      ? {}
+      : { OR: [{ countryId: null }, { countryId: { in: countryIds } }] };
 
   const tasks: Array<Promise<void>> = [];
 
@@ -44,11 +57,19 @@ export async function adminSearch(query: string): Promise<SearchHit[]> {
         .findMany({
           where: {
             deletedAt: null,
+            ...countryScope,
             OR: [{ name: contains }, { email: contains }, { company: contains }, { phone: contains }],
           },
           orderBy: { createdAt: 'desc' },
           take,
-          select: { id: true, name: true, email: true, company: true, status: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            company: true,
+            status: true,
+            country: { select: { name: true } },
+          },
         })
         .then((rows) => {
           for (const row of rows) {
@@ -56,7 +77,14 @@ export async function adminSearch(query: string): Promise<SearchHit[]> {
               id: row.id,
               type: 'Lead',
               title: row.name,
-              subtitle: [row.company, row.email].filter(Boolean).join(' · '),
+              subtitle: [
+                row.company,
+                row.email,
+                row.status.toLowerCase(),
+                multiCountry ? row.country.name : null,
+              ]
+                .filter(Boolean)
+                .join(' · '),
               href: `/admin/leads/${row.id}`,
             });
           }
@@ -124,6 +152,41 @@ export async function adminSearch(query: string): Promise<SearchHit[]> {
     );
   }
 
+  if (userCan(user, 'pages.view')) {
+    tasks.push(
+      prisma.city
+        .findMany({
+          where: { ...countryScope, OR: [{ name: contains }, { slug: contains }] },
+          orderBy: { name: 'asc' },
+          take,
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            status: true,
+            country: { select: { name: true, slug: true } },
+          },
+        })
+        .then((rows) => {
+          for (const row of rows) {
+            hits.push({
+              id: row.id,
+              type: 'City',
+              title: row.name,
+              subtitle: [
+                `/${[row.country.slug, row.slug].filter(Boolean).join('/')}`,
+                row.status.toLowerCase(),
+                multiCountry ? row.country.name : null,
+              ]
+                .filter(Boolean)
+                .join(' · '),
+              href: `/admin/cities/${row.id}`,
+            });
+          }
+        }),
+    );
+  }
+
   if (userCan(user, 'products.view')) {
     tasks.push(
       prisma.product
@@ -178,7 +241,10 @@ export async function adminSearch(query: string): Promise<SearchHit[]> {
     tasks.push(
       prisma.form
         .findMany({
-          where: { deletedAt: null, OR: [{ name: contains }, { slug: contains }] },
+          where: {
+            deletedAt: null,
+            AND: [formCountryScope, { OR: [{ name: contains }, { slug: contains }] }],
+          },
           take,
           select: { id: true, name: true, slug: true },
         })
@@ -241,5 +307,9 @@ export async function adminSearch(query: string): Promise<SearchHit[]> {
   }
 
   await Promise.all(tasks);
-  return hits.slice(0, 24);
+  // Groups arrive in whatever order their queries finished; list them in a
+  // fixed order so results do not reshuffle between keystrokes.
+  return hits
+    .sort((a, b) => SEARCH_TYPE_ORDER.indexOf(a.type) - SEARCH_TYPE_ORDER.indexOf(b.type))
+    .slice(0, SEARCH_PER_TYPE * SEARCH_TYPE_ORDER.length);
 }

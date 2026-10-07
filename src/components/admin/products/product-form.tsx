@@ -21,6 +21,7 @@ import { Spinner } from '@/components/ui/icons';
 import { slugify } from '@/lib/utils/slug';
 import { SUPPORTED_CURRENCIES, formatMoney } from '@/lib/utils/money';
 import { cn } from '@/lib/utils/cn';
+import { DateTimeField } from '@/components/ui/date-field';
 
 export type ProductFormValues = {
   id?: string;
@@ -487,11 +488,14 @@ export function ProductForm({
                   htmlFor="publishedAt"
                   error={errors.publishedAt}
                 >
-                  <Input
+                  <DateTimeField
                     id="publishedAt"
-                    type="datetime-local"
+                    label={values.status === 'SCHEDULED' ? 'Publish at' : 'Published date'}
                     value={values.publishedAt}
-                    onChange={(e) => set('publishedAt', e.target.value)}
+                    invalid={!!errors.publishedAt}
+                    // Sent as typed and read on the server, which applies its own zone.
+                    showTimeZone={false}
+                    onChange={(next) => set('publishedAt', next)}
                   />
                 </Field>
               </div>

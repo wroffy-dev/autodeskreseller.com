@@ -51,6 +51,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/toast';
 import { Spinner } from '@/components/ui/icons';
 import { cn } from '@/lib/utils/cn';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 
 export type BuilderSection = {
   id: string;
@@ -505,30 +506,22 @@ function SectionEditor({
 
   return (
     <div className="border-t border-hairline">
-      <div className="flex items-center gap-1 border-b border-hairline px-3 py-2">
-        <button
-          type="button"
-          onClick={() => setTab('content')}
-          aria-pressed={tab === 'content'}
-          className={cn(
-            'rounded-lg px-3 py-1.5 text-sm transition-colors',
-            tab === 'content' ? 'bg-brand/10 font-medium text-brand' : 'text-muted hover:text-content',
-          )}
-        >
-          Content
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('design')}
-          aria-pressed={tab === 'design'}
-          className={cn(
-            'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors',
-            tab === 'design' ? 'bg-brand/10 font-medium text-brand' : 'text-muted hover:text-content',
-          )}
-        >
-          <Settings className="h-3.5 w-3.5" aria-hidden="true" />
-          Design
-        </button>
+      <div className="border-b border-hairline px-3 py-2">
+        <SegmentedControl
+          semantics="tabs"
+          label="Section editor"
+          size="sm"
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'content', label: 'Content' },
+            {
+              value: 'design',
+              label: 'Design',
+              icon: <Settings className="h-3.5 w-3.5" aria-hidden="true" />,
+            },
+          ]}
+        />
       </div>
 
       <fieldset disabled={!canEdit || saving} className="space-y-4 p-4">

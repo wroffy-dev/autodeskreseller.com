@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { Search, X, SlidersHorizontal, Check } from 'lucide-react';
+import { Search, X, SlidersHorizontal, Check, CalendarDays } from 'lucide-react';
 import {
   describeFilters,
   countActiveFilters,
@@ -19,6 +19,8 @@ import {
   type RangePreset,
 } from '@/lib/admin/date-range';
 import { Button } from '@/components/ui/button';
+import { Popover } from '@/components/ui/popover';
+import { DateRangeCalendar } from '@/components/ui/date-field';
 import { cn } from '@/lib/utils/cn';
 
 /**
@@ -346,22 +348,11 @@ function DateRangeControl({
 }) {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: MouseEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', onPointerDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onPointerDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
+  const buttonRef = React.useRef<HTMLButtonElement>(null);
+  // The calendar's first click only starts a range; the filter applies once
+  // both ends exist, so the list does not reload on a half-chosen range.
+  const [draft, setDraft] = React.useState({ from, to });
+  React.useEffect(() => setDraft({ from, to }), [from, to]);
 
   // Named when it matches a preset, spelled out otherwise — "Last 7 days"
   // reads better on the button than "2026-09-04 → 2026-09-10".
@@ -383,17 +374,27 @@ function DateRangeControl({
   return (
     <div className="relative" ref={ref}>
       <Button
+        ref={buttonRef}
         variant="outline"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
+        aria-haspopup="dialog"
         className={cn('max-w-[14rem]', active && 'border-brand/40 bg-brand/[0.04] text-brand')}
       >
+        <CalendarDays className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span className="truncate">{summary}</span>
       </Button>
 
-      {open ? (
-        <div className="glass-menu absolute left-0 top-full z-dropdown mt-1.5 w-72 rounded-xl border border-hairline bg-surface p-3 shadow-xl">
-          <div className="mb-3 grid grid-cols-2 gap-1">
+      <Popover
+        open={open}
+        onClose={() => setOpen(false)}
+        anchorRef={ref}
+        returnFocusRef={buttonRef}
+        label={label}
+        sheetTitle={label}
+      >
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="grid grid-cols-2 content-start gap-1 sm:w-36 sm:grid-cols-1">
             {DATE_QUICK_PICKS.map((pick) => {
               const picked = resolveRange({ range: pick });
               const isActive = from === picked.from && to === picked.to;
@@ -404,7 +405,7 @@ function DateRangeControl({
                   onClick={() => onChange(picked.from, picked.to)}
                   aria-pressed={isActive}
                   className={cn(
-                    'rounded-lg px-2.5 py-1.5 text-left text-[0.8125rem] transition-colors',
+                    'admin-focus-ring rounded-lg px-2.5 py-1.5 text-left text-[0.8125rem] transition-colors',
                     isActive
                       ? 'bg-brand/10 font-medium text-brand'
                       : 'text-content hover:bg-muted/[0.07]',
@@ -416,51 +417,40 @@ function DateRangeControl({
             })}
           </div>
 
-          <p className="mb-2 border-t border-hairline pt-2.5 text-xs font-semibold uppercase tracking-wide text-muted">
-            Custom
-          </p>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <Label htmlFor="filter-from" className="text-xs font-normal text-muted">
-                From
-              </Label>
-              <Input
-                id="filter-from"
-                type="date"
-                value={from}
-                max={to || undefined}
-                onChange={(event) => onChange(event.target.value, to)}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="filter-to" className="text-xs font-normal text-muted">
-                To
-              </Label>
-              <Input
-                id="filter-to"
-                type="date"
-                value={to}
-                min={from || undefined}
-                onChange={(event) => onChange(from, event.target.value)}
-              />
-            </div>
-          </div>
-          <div className="mt-3 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => onChange('', '')}
-              className="rounded-lg px-2 py-1 text-xs text-muted transition-colors hover:text-content"
-            >
-              Clear dates
-            </button>
-            <Button size="sm" onClick={() => setOpen(false)}>
-              <Check className="h-3.5 w-3.5" aria-hidden="true" />
-              Done
-            </Button>
+          <div className="border-hairline sm:border-l sm:pl-3">
+            <DateRangeCalendar
+              from={draft.from}
+              to={draft.to}
+              onChange={(nextFrom, nextTo) => {
+                setDraft({ from: nextFrom, to: nextTo });
+                if (nextFrom && nextTo) onChange(nextFrom, nextTo);
+                else if (!nextFrom && !nextTo) onChange('', '');
+              }}
+            />
           </div>
         </div>
-      ) : null}
+        <div className="mt-3 flex items-center justify-between border-t border-hairline pt-3">
+          <button
+            type="button"
+            onClick={() => onChange('', '')}
+            className="admin-focus-ring rounded-lg px-2 py-1 text-xs text-muted transition-colors hover:text-content"
+          >
+            Clear dates
+          </button>
+          <Button
+            size="sm"
+            onClick={() => {
+              // A single picked day means a one-day range.
+              if (draft.from && !draft.to) onChange(draft.from, draft.from);
+              setOpen(false);
+              buttonRef.current?.focus();
+            }}
+          >
+            <Check className="h-3.5 w-3.5" aria-hidden="true" />
+            Done
+          </Button>
+        </div>
+      </Popover>
     </div>
   );
 }

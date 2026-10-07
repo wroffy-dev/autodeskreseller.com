@@ -116,25 +116,40 @@ export async function savePopup(
   }
 }
 
-export async function togglePopup(popupId: string): Promise<ActionResult> {
+/**
+ * Turns a popup on or off.
+ *
+ * With `next`, the popup is set to that state rather than flipped, so a switch
+ * that was pressed twice in two tabs, or retried after a dropped response,
+ * lands where the admin left it. Returns the stored state either way.
+ */
+export async function togglePopup(
+  popupId: string,
+  next?: boolean,
+): Promise<ActionResult<{ isActive: boolean }>> {
   try {
     const user = await authorize('marketing.manage');
     const popup = await prisma.popup.findUnique({ where: { id: popupId } });
     if (!popup) return failure('That popup no longer exists.');
 
-    await prisma.popup.update({ where: { id: popupId }, data: { isActive: !popup.isActive } });
+    const isActive = typeof next === 'boolean' ? next : !popup.isActive;
+    if (isActive === popup.isActive) {
+      return success({ isActive }, isActive ? 'Popup enabled.' : 'Popup disabled.');
+    }
+
+    await prisma.popup.update({ where: { id: popupId }, data: { isActive } });
 
     await recordAudit({
       actor: user,
-      action: popup.isActive ? 'disabled' : 'enabled',
+      action: isActive ? 'enabled' : 'disabled',
       entity: 'Popup',
       entityId: popupId,
-      summary: `${popup.isActive ? 'Disabled' : 'Enabled'} popup “${popup.name}”`,
+      summary: `${isActive ? 'Enabled' : 'Disabled'} popup “${popup.name}”`,
     });
 
     revalidatePath('/admin/popups');
     revalidatePath('/', 'layout');
-    return success(undefined, popup.isActive ? 'Popup disabled.' : 'Popup enabled.');
+    return success({ isActive }, isActive ? 'Popup enabled.' : 'Popup disabled.');
   } catch (error) {
     return toActionError(error);
   }
