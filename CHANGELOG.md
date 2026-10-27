@@ -12,6 +12,11 @@ This project uses [semantic versioning](https://semver.org): MAJOR.MINOR.PATCH.
 
 ### Changed
 
+- **Prisma settings moved to `prisma.config.ts`.** The seed command now lives
+  there instead of the `prisma` key in `package.json`, which Prisma 7 removes.
+  The config loads `.env` itself, because the CLI stops doing that once a
+  config file exists; variables already set in the environment still win. The
+  Docker image copies the file so `migrate deploy` uses the same settings.
 - **Admin interface upgrade.** Shared design tokens for glass, controls, focus,
   semantic states, type, spacing and motion; milky light and smoked dark glass
   on navigation and overlays only, with opaque fallbacks under

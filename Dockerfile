@@ -7,7 +7,7 @@ FROM node:22-alpine AS deps
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json* prisma.config.ts ./
 COPY prisma ./prisma
 # `npm ci` runs prisma generate through the postinstall of @prisma/client.
 RUN npm ci --ignore-scripts && npx prisma generate
@@ -28,7 +28,7 @@ FROM node:22-alpine AS prod-deps
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json* prisma.config.ts ./
 COPY prisma ./prisma
 RUN npm ci --omit=dev --ignore-scripts && npx prisma generate
 
@@ -103,9 +103,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Schema, migrations and the compiled seed, so the entrypoint can run
-# `migrate deploy` and, when asked, the one-time seed.
+# Schema, migrations, the compiled seed and the Prisma config, so the
+# entrypoint can run `migrate deploy` and, when asked, the one-time seed.
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts ./
 
 # Operational scripts run from the container's own shell: the migration
 # rehearsal, and the market clone that fills a new storefront. Neither needs a
